@@ -1,5 +1,13 @@
-Thank you to all contributors:
-------------------------------
+Obrigado a todos que contribuiram com a tradução:
+-------------------------------------------------
+
+
+
+
+
+Projeto original
+Obrigado a todos que contribuiram:
+----------------------------------
 
 * [Akash Shende](https://github.com/akash0x53)
 * [Jakub Kramarz](https://github.com/jkramarz)
