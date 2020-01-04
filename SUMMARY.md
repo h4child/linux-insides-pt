@@ -1,8 +1,8 @@
 ### Sumário
 
 * [Booting](Booting/README.md)
-    * [Do bootloader para o kernel](Booting/linux-bootstrap-1.md)
-    * [Primeiros passo na código de configuração do Kernel](Booting/linux-bootstrap-2.md)
+    * [Do bootloader ao kernel](Booting/linux-bootstrap-1.md)
+    * [Primeiros passo no código de configuração do Kernel](Booting/linux-bootstrap-2.md)
     * [Inicialização do modo vídeo e a transição para o modo protegido](Booting/linux-bootstrap-3.md)
     * [Transiçãopara o modo 64-bit](Booting/linux-bootstrap-4.md)
     * [Descompressão do Kernel](Booting/linux-bootstrap-5.md)
