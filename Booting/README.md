@@ -1,12 +1,15 @@
 # Kernel Boot Process
 
-This chapter describes the linux kernel boot process. Here you will see a series of posts which describes the full cycle of the kernel loading process:
+Esse capítulo descreve o processo boot do kernel Linux. Aqui você verá uma série de postagem o que descreve todos os ciclos de carregamento do processo no kernel:
 
-* [From the bootloader to kernel](linux-bootstrap-1.md) - describes all stages from turning on the computer to running the first instruction of the kernel.
-* [First steps in the kernel setup code](linux-bootstrap-2.md) - describes first steps in the kernel setup code. You will see heap initialization, query of different parameters like EDD, IST and etc...
-* [Video mode initialization and transition to protected mode](linux-bootstrap-3.md) - describes video mode initialization in the kernel setup code and transition to protected mode.
-* [Transition to 64-bit mode](linux-bootstrap-4.md) - describes preparation for transition into 64-bit mode and details of transition.
-* [Kernel Decompression](linux-bootstrap-5.md) - describes preparation before kernel decompression and details of direct decompression.
-* [Kernel random address randomization](linux-bootstrap-6.md) - describes randomization of the Linux kernel load address.
 
-This chapter coincides with `Linux kernel v4.17`.
+* [Do bootloader ao kernel](linux-bootstrap-1.md) - descreve todos os estágios de ligar o computador ao executar o primeira instrução do kernel Linux.
+* [Primeiros passo na código de configuração do Kernel](linux-bootstrap-2.md) - Descreve primeiros passos no código de configuração do Kernel. Você vai ver a inicialização do heap, query de diferentes parâmetros como EDD, IST e etc...
+* [Inicialização do modo vídeo e a transição para o modo protegido](linux-bootstrap-3.md) - descreve inicialização do modo vídeo no código de configuração do kernel e transição para o modo protegido.
+* [Transiçãopara o modo 64-bit](linux-bootstrap-4.md) - descreve preparação para a transição no modo 64-bit e detalhes da transição
+* [Descompressão do Kernel](linux-bootstrap-5.md) - descreve preparação antes descomprimir o kernel e detalhes da descompressão direta.
+* [Endereço aleatório carregamento do kernel](linux-bootstrap-6.md) - descreve 
+o aleatóriamente do endereço de carregamento do kernel Linux.
+
+
+Esse capítulo coincide com `Linux kernel v4.17`.
