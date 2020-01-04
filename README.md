@@ -22,7 +22,7 @@ https://groups.google.com/forum/#!forum/kernelhacking
 Em outras linguagens
 --------------------
 
-  * [Brazilian Portuguese - rodgger](https://github.com/rodggerbr/linux-insides)
+  * [Brazilian Portuguese (aqui) - rodgger](https://github.com/rodggerbr/linux-insides)
   * [Brazilian Portuguese - Mauri](https://github.com/mauri870/linux-insides)
   * [Chinese](https://github.com/MintCN/linux-insides-zh)
   * [Japanese](https://github.com/tkmru/linux-insides-ja)
