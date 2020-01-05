@@ -1,79 +1,80 @@
-Kernel booting process. Part 1.
+Processo booting no kernel. Part 1.
 ================================================================================
 
-From the bootloader to the kernel
+Do bootloader ao kernel
 --------------------------------------------------------------------------------
 
-If you read my previous [blog posts](https://0xax.github.io/categories/assembler/), you might have noticed that I  have been involved with low-level programming for some time. I wrote some posts about assembly programming for `x86_64` Linux and, at the same time, started to dive into the Linux kernel source code.
+Se você leu as minhas [postagens anteriores](https://0xax.github.io/categories/assembler/), você pode ter notado que eu estive envolvido com programação de baixo nível por algum tempo. Eu escrevi algumas postagem sobre programando assembly para Linux `x86_64` e no mesmo tempo, comecei a mergulhar no código fonte do kernel Linux.
 
-I have a great interest in understanding how low-level things work, how programs run on my computer, how they are located in memory, how the kernel manages processes and memory, how the network stack works at a low level, and many many other things. So, I decided to write yet another series of posts about the Linux kernel for the **x86_64** architecture.
+Eu tenho um grande interesse em entender como as coisas funcionam em baixo nível, como os programas executam no computador, como são localizados na memória, como o kernel administra os processos e memória, como a pilha de rede funcionam em baixo nível e muitas outras coisas. Então, eu decidi escrever uma série de postagens sobre kernel Linux para arquitetura **x86_64**.
 
-Note that I'm not a professional kernel hacker and I don't write code for the kernel at work. It's just a hobby. I just like low-level stuff, and it is interesting for me to see how these things work. So if you notice anything confusing, or if you have any questions/remarks, ping me on Twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com) or just create an [issue](https://github.com/0xAX/linux-insides/issues/new). I appreciate it.
+Note que e não sou um profisional kernel hacker e eu não escrevo código para o kernel no trabalho. É apenas um hobby. Eu apenas gosto das coisas em baixo nível e é interessante para eu ver como essas coisas funcionam. Então se você perceber algo confuso ou se você ter qualquer perguntas/observações, me avise no twitter [autor 0xAX](https://twitter.com/0xAX) [tradutor rodgger](https://twitter.com/rodgger1), 
 
-All posts will also be accessible at [github repo](https://github.com/0xAX/linux-insides) and, if you find something wrong with my English or the post content, feel free to send a pull request.
+Se você encontrar alguma coisa errada com meu português ou sobre o conteúdo, sinta-se livre para enviar um pull request.
 
-*Note that this isn't official documentation, just learning and sharing knowledge.*
+*Note que esse não é uma documentção oficial, apenas aprendendo e compartilhanddo conhecimento.*
 
-**Required knowledge**
+**Conhecimento requeridos**
 
-* Understanding C code
-* Understanding assembly code (AT&T syntax)
+* Entender código C
+* Entender código assembly (AT&T syntax)
 
-Anyway, if you're just starting to learn such tools, I will try to explain some parts during this and the following posts. Alright, this is the end of the simple introduction. Let's start to dive into the Linux kernel and low-level stuff!
+De qualquer forma, se você esta apenas começando aprender ferramentas, eu tentarei explicar algumas partes durante este e as sequintes postagens. Bem, esse é o final da introdução simples. Deixe começar mergulhar no kernel Linux e coisas de baixo nível!
 
-I started writing these posts at the time of the `3.18` Linux kernel, and many things have changed since that time. If there are changes, I will update the posts accordingly.
+Eu comecei a escrever estas postagens na versão `3.18` do kernel Linux, e muitas coisas mudaram deste aquele tempo. Se houver mudanças, eu atualizarei a postagens adequadamente.
 
-The Magical Power Button, What happens next?
+
+O Mágico Botão Power, o que acontece depois?
 --------------------------------------------------------------------------------
 
-Although this is a series of posts about the Linux kernel, we won't start directly from the kernel code. As soon as you press the magical power button on your laptop or desktop computer, it starts working. The motherboard sends a signal to the [power supply](https://en.wikipedia.org/wiki/Power_supply) device. After receiving the signal, the power supply provides the proper amount of electricity to the computer. Once the motherboard receives the [power good signal](https://en.wikipedia.org/wiki/Power_good_signal), it tries to start the CPU. The CPU resets all leftover data in its registers and sets predefined values for each of them.
+Embora isso é uma série de postagens sobre kernel linux, não comearemos diretamente no código do kernel. Assim que pressionou o botão mágico power no laptop ou computador desktop, começa funcionar. A placa-mãe envia um sinal para [power suply](https://en.wikipedia.org/wiki/Power_supply)[(similar pt)](https://pt.wikipedia.org/wiki/Fonte_de_alimentação) e tenta iniciar a CPU.A CPU reseta todos os dados no registro e valor predefinido para cada um deles
 
-The [80386](https://en.wikipedia.org/wiki/Intel_80386) and later CPUs define the following predefined data in CPU registers after the computer resets:
+O [80386](https://en.wikipedia.org/wiki/Intel_80386)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_80386) e os CPUs porteriores definem os seguintes dados predefinidos nos registros da CPU após resetar.
 
 ```
-IP          0xfff0
-CS selector 0xf000
-CS base     0xffff0000
+IP          0xFFF0
+CS selector 0xF000
+CS base     0xFFFF0000
 ```
+O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_(memória)) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, qual significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 megabyte`. Mas apenas tem registros `16-bit`, qual tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
 
-The processor starts working in [real mode](https://en.wikipedia.org/wiki/Real_mode). Let's back up a little and try to understand [memory segmentation](https://en.wikipedia.org/wiki/Memory_segmentation) in this mode. Real mode is supported on all x86-compatible processors, from the [8086](https://en.wikipedia.org/wiki/Intel_8086) CPU all the way to the modern Intel 64-bit CPUs. The `8086` processor has a 20-bit address bus, which means that it could work with a `0-0xFFFFF` or `1 megabyte` address space. But it only has `16-bit` registers, which have a maximum address of `2^16 - 1` or `0xffff` (64 kilobytes).
+A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_(memória)) é para construir o uso de todos os espaços de endereços disponível. Toda memória é dividida em paquenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
 
-[Memory segmentation](https://en.wikipedia.org/wiki/Memory_segmentation) is used to make use of all the address space available. All memory is divided into small, fixed-size segments of `65536` bytes (64 KB). Since we cannot address memory above `64 KB` with 16-bit registers, an alternate method was devised.
-
-An address consists of two parts: a segment selector, which has a base address; and an offset from this base address. In real mode, the associated base address of a segment selector is `Segment Selector * 16`. Thus, to get a physical address in memory, we need to multiply the segment selector part by `16` and add the offset to it:
+Um endereço consiste em duas partes: um seletor de segmento , qual tem uma base de endereço e um offset (deslocamento) da base de endereço. No modo real, o endereço da base asociada de um seletor de segmento é `seletor de segmento * 16`. Então, para obter um endereço físico na memória, nós precisamos multiplicar o seletor do segmento por `16` e adcionar o deslocamento  para isso:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
 ```
 
-For example, if `CS:IP` is `0x2000:0x0010`, then the corresponding physical address will be:
+Por exemplo, se `CS:IP` é `0x2000:0x0010`, então o endereço físico correspondente será:
 
 ```python
 >>> hex((0x2000 << 4) + 0x0010)
 '0x20010'
 ```
 
-But, if we take the largest segment selector and offset, `0xffff:0xffff`, then the resulting address will be:
+Mas, pegarmos o maior seletor de segmentos e offset, `0xFFFF:0xFFFF`, então o endereço será:
+
 
 ```python
->>> hex((0xffff << 4) + 0xffff)
+>>> hex((0xFFFF << 4) + 0xFFFF)
 '0x10ffef'
 ```
 
-which is `65520` bytes past the first megabyte. Since only one megabyte is accessible in real mode, `0x10ffef` becomes `0x00ffef` with the [A20 line](https://en.wikipedia.org/wiki/A20_line) disabled.
+O qual `65520` bytes passa de 1 megabyte. Como apenas um megabyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
 
-Ok, now we know a little bit about real mode and its memory addressing. Let's get back to discussing register values after reset.
+Ok, agora nós conhecemos um pouco sobre modo real e endereçamento de memória. Deixe voltar para a conversa dos valores do registradores depois do resetar.
 
-The `CS` register consists of two parts: the visible segment selector and the hidden base address. While the base address is normally formed by multiplying the segment selector value by 16, during a hardware reset the segment selector in the CS register is loaded with `0xf000` and the base address is loaded with `0xffff0000`. The processor uses this special base address until `CS` changes.
+O registro `CS` consiste de duas partes: o seletor de segmento visível e o endereço base oculto. Enquanto o endereço base é normalmente formato multiplicando o valor do seletor de segmento por 16, durante o reset no hardware o selector de segmento no registro CS é carregado com `0xF000` e o endereço base é carregado com `0xFFFF0000`. O processador usa essa base de endereço especial até  `CS` mudar.
 
-The starting address is formed by adding the base address to the value in the EIP register:
+O endereço inicial é formato adicionando o endereço base ao valor no registro IP:
 
 ```python
 >>> 0xffff0000 + 0xfff0
 '0xfffffff0'
 ```
 
-We get `0xfffffff0`, which is 16 bytes below 4GB. This point is called the [reset vector](https://en.wikipedia.org/wiki/Reset_vector). It's the memory location at which the CPU expects to find the first instruction to execute after reset. It contains a [jump](https://en.wikipedia.org/wiki/JMP_%28x86_instruction%29) (`jmp`) instruction that usually points to the [BIOS](https://en.wikipedia.org/wiki/BIOS) (Basic Input/Output System) entry point. For example, if we look in the [coreboot](https://www.coreboot.org/) source code (`src/cpu/x86/16bit/reset16.inc`), we see:
+Obtemos `0xFFFFFFF0`, que é 16 bytes abaixo dos 4GiB. Esse ponteiro é chamado de [redefinir vetor(reset vector)](https://en.wikipedia.org/wiki/Reset_vector). É a localização de memória no qual a CPT esperar encontrar o primeira instrução para executar depois de resetar. Contém uma instrução [jump](https://en.wikipedia.org/wiki/JMP_%28x86_instruction%29)[(similar pt)](http://marco.uminho.pt/~joao/Computacao2/node47.html) (`jmp`) que usualmente aponta para a entrada da [Bios]((https://en.wikipedia.org/wiki/BIOS)[(similar pt)](https://pt.wikipedia.org/wiki/BIOS)(Basic Input/Output System). Por exemplo, se olharmos no código fonte(`src/cpu/x86/16bit/reset16.inc` [github](https://github.com/coreboot/coreboot/blob/master/src/cpu/x86/16bit/reset16.inc)) [coreboot](https://www.coreboot.org/), veremos:
 
 ```assembly
     .section ".reset", "ax", %progbits
@@ -84,6 +85,8 @@ _start:
     .int   _start16bit - ( . + 2 )
     ...
 ```
+
+------------traduzido até aqui
 
 Here we can see the `jmp` instruction [opcode](http://ref.x86asm.net/coder32.html#xE9), which is `0xe9`, and its destination address at `_start16bit - ( . + 2)`.
 
