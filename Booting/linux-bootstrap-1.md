@@ -36,7 +36,7 @@ IP          0xFFF0
 CS selector 0xF000
 CS base     0xFFFF0000
 ```
-O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, qual significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 megabyte`. Mas apenas tem registros `16-bit`, qual tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
+O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, qual significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 mebibyte`. Mas apenas tem registros `16-bit`, qual tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
 
 A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é para construir o uso de todos os espaços de endereços disponível. Toda memória é dividida em paquenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
 
@@ -61,7 +61,7 @@ Mas, pegarmos o maior seletor de segmentos e offset, `0xFFFF:0xFFFF`, então o e
 '0x10ffef'
 ```
 
-O qual `65520` bytes passa de 1 megabyte. Como apenas um megabyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
+O qual é `65520` bytes a mais que 1 mebibyte (0x10ffef = 1 mebibyte + 65520). Como apenas um mebibyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
 
 Ok, agora nós conhecemos um pouco sobre modo real e endereçamento de memória. Deixe voltar para a conversa dos valores do registradores depois do resetar.
 
