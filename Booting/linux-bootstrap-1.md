@@ -38,7 +38,7 @@ CS base     0xFFFF0000
 ```
 O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, qual significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 mebibyte`. Mas apenas tem registros `16-bit`, qual tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
 
-A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é para construir o uso de todos os espaços de endereços disponível. Toda memória é dividida em paquenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
+A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é usado para utilizar todo o espaço de endereço disponível. Toda memória é dividida em paquenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
 
 Um endereço consiste em duas partes: um seletor de segmento , qual tem uma base de endereço e um offset (deslocamento) da base de endereço. No modo real, o endereço da base asociada de um seletor de segmento é `seletor de segmento * 16`. Então, para obter um endereço físico na memória, nós precisamos multiplicar o seletor do segmento por `16` e adcionar o deslocamento  para isso:
 
@@ -86,29 +86,29 @@ _start:
     ...
 ```
 
-------------traduzido até aqui
+Aqui podemos ver [opcode](http://ref.x86asm.net/coder32.html#xE9) da instrução `jmp`, qual é `0xe9` e endereço de destino em `_start16bit - ( . + 2)`.
 
-Here we can see the `jmp` instruction [opcode](http://ref.x86asm.net/coder32.html#xE9), which is `0xe9`, and its destination address at `_start16bit - ( . + 2)`.
+Podemos ver que a seção `reset (resetar)` é 16 bytes e é compilado para começar do endereço `0xfffffff0` (`src/cpu/x86/16bit/reset16.ld` [github](https://github.com/coreboot/coreboot/blob/master/src/cpu/x86/16bit/reset16.ld))):
 
-We also see that the `reset` section is `16` bytes and is compiled to start from the address `0xfffffff0` (`src/cpu/x86/16bit/reset16.ld`):
 
 ```
 SECTIONS {
-    /* Trigger an error if I have an unuseable start address */
-    _bogus = ASSERT(_start16bit >= 0xffff0000, "_start16bit too low. Please report.");
-    _ROMTOP = 0xfffffff0;
-    . = _ROMTOP;
-    .reset . : {
-        *(.reset);
-        . = 15;
-        BYTE(0x00);
-    }
+	/* Trigger an error if I have an unuseable start address */
+	_TOO_LOW = CONFIG_X86_RESET_VECTOR - 0xfff0;
+	_bogus = ASSERT(_start16bit >= _TOO_LOW, "_start16bit too low. Please report.");
+
+	. = CONFIG_X86_RESET_VECTOR;
+	.reset . : {
+		*(.reset);
+		. = 15;
+		BYTE(0x00);
+	}
 }
 ```
 
-Now the BIOS starts. After initializing and checking the hardware, the BIOS needs to find a bootable device. A boot order is stored in the BIOS configuration, controlling which devices the BIOS attempts to boot from. When attempting to boot from a hard drive, the BIOS tries to find a boot sector. On hard drives partitioned with an [MBR partition layout](https://en.wikipedia.org/wiki/Master_boot_record), the boot sector is stored in the first `446` bytes of the first sector, where each sector is `512` bytes. The final two bytes of the first sector are `0x55` and `0xaa`, which designates to the BIOS that this device is bootable.
+Agora inicia a BIOS. Após inicializar e checar o hardware, a BIOS precisa encontrar um dispositivo iniciável. A ordem do boot é armazenado na configuração da BIOS, controlando a partir de qual dispositivo a BIOS usar. Iniciar de um hard disk, a BIOS tenta encontrar um setor boot. Na partição hard disk com um [layout da partição MBR](https://en.wikipedia.org/wiki/Master_boot_record)[(similar pt)](https://pt.wikipedia.org/wiki/Master_Boot_Record), o setor de boot é armazenado no primeiro `446` bytes do primeiro setor, onde cada setor é `512` bytes. O dois bytes finais do primeiro setor são `0x55` e `0xaa`, que indica a BIOS que o dispositivo é iniciável.
 
-For example:
+Por exemplo:
 
 ```assembly
 ;
@@ -131,19 +131,23 @@ db 0x55
 db 0xaa
 ```
 
-Build and run this with:
+Construir e executar isso com:
 
 ```
 nasm -f bin boot.nasm && qemu-system-x86_64 boot
 ```
 
-This will instruct [QEMU](https://www.qemu.org/) to use the `boot` binary that we just built as a disk image. Since the binary generated by the assembly code above fulfills the requirements of the boot sector (the origin is set to `0x7c00` and we end it with the magic sequence), QEMU will treat the binary as the master boot record (MBR) of a disk image.
+Isso instruirá o [QEMU](https://www.qemu.org/) usar o binário `boot` que nós contruimos a imagem de disco. Como o binário gerado pelo código do assembly acima cumpre o requerimento do setor boot (a origem é definido para `0x7c00` e nós finalizamos com a sequencia mágica), QEMU vai atuar binário como o Master Boot Record (MBR) de uma imagem de disco. 
 
-You will see:
+Você irá ver:
 
-![Simple bootloader which prints only `!`](images/simple_bootloader.png)
+![Bootloader simples que mostra apenas `!`](images/simple_bootloader.png)
 
-In this example, we can see that the code will be executed in `16-bit` real mode and will start at `0x7c00` in memory. After starting, it calls the [0x10](http://www.ctyme.com/intr/rb-0106.htm) interrupt, which just prints the `!` symbol. It fills the remaining `510` bytes with zeros and finishes with the two magic bytes `0xaa` and `0x55`.
+Neste exemplo, nós podemos ver que o código vai ser executado em modo real `16-bit` e começar no na memória `0x7c00`. Após começar, chamar a interrupção [0x10](http://www.ctyme.com/intr/rb-0106.htm), que mostra o símbolo `!`. Preenche o resto `510` bytes com zeros e finaliza com os dois bytes `0xaa` e `0x55`.
+
+
+####Traduzido até aqui.
+
 
 You can see a binary dump of this using the `objdump` utility:
 
