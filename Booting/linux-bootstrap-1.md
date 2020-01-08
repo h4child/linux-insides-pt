@@ -61,7 +61,7 @@ Mas, pegarmos o maior seletor de segmentos e offset, `0xFFFF:0xFFFF`, então o e
 '0x10ffef'
 ```
 
-O qual é `65520` bytes a mais que 1 mebibyte (0x10ffef = 1 mebibyte + 65520). Como apenas um mebibyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
+O qual é `65520` bytes a mais que 1 mebibyte `(0x10ffef = 1 mebibyte + 65520)`. Como apenas um mebibyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
 
 Ok, agora nós conhecemos um pouco sobre modo real e endereçamento de memória. Deixe voltar para a conversa dos valores do registradores depois do resetar.
 
@@ -141,68 +141,68 @@ Isso instruirá o [QEMU](https://www.qemu.org/) usar o binário `boot` que nós 
 
 Você irá ver:
 
-![Bootloader simples que mostra apenas `!`](images/simple_bootloader.png)
+![Simples Bootloader que mostra apenas `!`](images/simple_bootloader.png)
 
 Neste exemplo, nós podemos ver que o código vai ser executado em modo real `16-bit` e começar no na memória `0x7c00`. Após começar, chamar a interrupção [0x10](http://www.ctyme.com/intr/rb-0106.htm), que mostra o símbolo `!`. Preenche o resto `510` bytes com zeros e finaliza com os dois bytes `0xaa` e `0x55`.
 
-
-####Traduzido até aqui.
-
-
-You can see a binary dump of this using the `objdump` utility:
+Você pode ver o dump(despejo) do binário disso usando o `objdump`:
 
 ```
 nasm -f bin boot.nasm
 objdump -D -b binary -mi386 -Maddr16,data16,intel boot
 ```
 
-A real-world boot sector has code for continuing the boot process and a partition table instead of a bunch of 0's and an exclamation mark. :) From this point onwards, the BIOS hands control over to the bootloader.
+O setor inicial, em um mundo real, tem código para continuar o processo de boot e uma tabela de partição em vez de um monte de 0's e um ponto de exclamação. :) Deste passo em diante, a BIOS passa a controlar sobre o bootloader.
 
-**NOTE**: As explained above, the CPU is in real mode. In real mode, calculating the physical address in memory is done as follows:
+**NOTE**: Como explicado acima, o CPU esta em modo real. Em modo real, calcular o endereço físico na memória é feita assim:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
 ```
 
-just as explained above. We have only 16-bit general purpose registers, which has a maximum value of `0xffff`, so if we take the largest values the result will be:
+Apenas explicado acima. Temos apenas um registro geral de 16-bit, que tem um valor máximo do `0xFFFF`, então se pegarmos os maiores valores o resultado será:
 
 ```python
 >>> hex((0xffff * 16) + 0xffff)
 '0x10ffef'
 ```
 
-where `0x10ffef` is equal to `1MB + 64KB - 16b`. An [8086](https://en.wikipedia.org/wiki/Intel_8086) processor (which was the first processor with real mode), in contrast, has a 20-bit address line. Since `2^20 = 1048576` is 1MB, this means that the actual available memory is 1MB.
+Onde `0x10ffef` é o maior endereço `0 até 0x10ffef`, com total `1MiB + 64KiB - 16B`. O processador [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086)  (qual foi o primeiro processador com modo real), em contraste, tem 20-bit de linha de endereço. Como `2^20 = 1048576 (0 até 2^20-1)` é 1MiB, isso significa que a memória disponivel atual é 1MiB. 
 
-In general, real mode's memory map is as follows:
+Em geral, memória em modo real é mapeada como seguinte:
 
 ```
-0x00000000 - 0x000003FF - Real Mode Interrupt Vector Table
-0x00000400 - 0x000004FF - BIOS Data Area
-0x00000500 - 0x00007BFF - Unused
-0x00007C00 - 0x00007DFF - Our Bootloader
-0x00007E00 - 0x0009FFFF - Unused
-0x000A0000 - 0x000BFFFF - Video RAM (VRAM) Memory
-0x000B0000 - 0x000B7777 - Monochrome Video Memory
-0x000B8000 - 0x000BFFFF - Color Video Memory
-0x000C0000 - 0x000C7FFF - Video ROM BIOS
-0x000C8000 - 0x000EFFFF - BIOS Shadow Area
-0x000F0000 - 0x000FFFFF - System BIOS
+0x00000000 - 0x000003FF - Real Mode Interrupt Vector Table (Tabelas de vetores de interrupções)
+0x00000400 - 0x000004FF - BIOS Data Area (Área de dados da BIOS)
+0x00000500 - 0x00007BFF - Unused (não utilizado)
+0x00007C00 - 0x00007DFF - Our Bootloader (nosso bootloader)
+0x00007E00 - 0x0009FFFF - Unused (não utilizado)
+0x000A0000 - 0x000BFFFF - Video RAM (VRAM) Memory (memória RAM de vídeo)
+0x000B0000 - 0x000B7777 - Monochrome Video Memory (mémória de vídeo monocromática)
+0x000B8000 - 0x000BFFFF - Color Video Memory (memória de vídeo em cores)
+0x000C0000 - 0x000C7FFF - Video ROM BIOS (ROM de vídeo da BIOS)
+0x000C8000 - 0x000EFFFF - BIOS Shadow Area (Área de sombra da BIOS)
+0x000F0000 - 0x000FFFFF - System BIOS (sistema da BIOS)
 ```
 
-At the beginning of this post, I wrote that the first instruction executed by the CPU is located at address `0xFFFFFFF0`, which is much larger than `0xFFFFF` (1MB). How can the CPU access this address in real mode? The answer is in the [coreboot](https://www.coreboot.org/Developer_Manual/Memory_map) documentation:
+No começo deste post, eu escrevi que a primeira instrução executada pelo CPU é localizada no endereço `0xFFFFFFF0`, qual é muito maior que `0xFFFFF` (1MB). Como a CPU pode acessar esse endereço no modo real? A resposta esta na documentação do [coreboot](https://www.coreboot.org/Developer_Manual/Memory_map):
 
 ```
 0xFFFE_0000 - 0xFFFF_FFFF: 128 kilobyte ROM mapped into address space
 ```
 
-At the start of execution, the BIOS is not in RAM, but in ROM.
+No início da execução, a BIOS não esta na RAM, mas em ROM.
 
-Bootloader
+
+Bootloader (carregador de inicialização)
 --------------------------------------------------------------------------------
 
-There are a number of bootloaders that can boot Linux, such as [GRUB 2](https://www.gnu.org/software/grub/) and [syslinux](http://www.syslinux.org/wiki/index.php/The_Syslinux_Project). The Linux kernel has a [Boot protocol](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt) which specifies the requirements for a bootloader to implement Linux support. This example will describe GRUB 2.
+Existe um número de bootloader que podem inicializar o Linux, tal como [GRUB 2](https://www.gnu.org/software/grub/) e [syslinux]http://www.syslinux.org/wiki/index.php/The_Syslinux_Project). O kernel Linux tem um [protocolo de boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt) que especifica os requerimentos para um bootloader implementar suporte ao Linux. Esse exemplo descreve GRUB 2.
 
-Continuing from before, now that the BIOS has chosen a boot device and transferred control to the boot sector code, execution starts from [boot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/boot.S;hb=HEAD). Its code is very simple, due to the limited amount of space available. It contains a pointer which is used to jump to the location of GRUB 2's core image. The core image begins with [diskboot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/diskboot.S;hb=HEAD), which is usually stored immediately after the first sector in the unused space before the first partition. The above code loads the rest of the core image, which contains GRUB 2's kernel and drivers for handling filesystems, into memory. After loading the rest of the core image, it executes the [grub_main](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/kern/main.c) function.
+Agora que a BIOS tem que escolher um dispositivo para inicializar e transferir o controle para o setor do boot, começa execução do [boot.img])(http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/boot.S;hb=HEAD). Código muito simples, devido a limitação de espaço disponível. Contém um ponteiro que é usado para pular para a localização da imagem principal do GRUB 2. A imagem começa com [diskboot.img](http://git.savannah.gnu.org/gitweb/?p=grub.git;a=blob;f=grub-core/boot/i386/pc/diskboot.S;hb=HEAD), que é geralmente armazenado logo depois do primeiro setor no espaço não utilizado (unused), antes da primeira partição. O código acima carrega o resto da imagem principal, que contém o kernel e os drivers do GRUB 2 para lidar com sistemas de arquivos (filesystems), na memória. Depois carrega o resto da imagem, executa a função [grub_main].
+
+
+##traduzido até aqui
 
 The `grub_main` function initializes the console, gets the base address for modules, sets the root device, loads/parses the grub configuration file, loads modules, etc. At the end of execution, the `grub_main` function moves grub to normal mode. The `grub_normal_execute` function (from the `grub-core/normal/main.c` source code file) completes the final preparations and shows a menu to select an operating system. When we select one of the grub menu entries, the `grub_menu_execute_entry` function runs, executing the grub `boot` command and booting the selected operating system.
 
