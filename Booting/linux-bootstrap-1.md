@@ -203,9 +203,7 @@ Agora que a BIOS tem que escolher um dispositivo para inicializar e transferir o
 
 A função `grub_main` inicializa o console, obtém o endereço base para módulos, defini o dispositivo principal, carrega/analisa o arquivos de configuração grub e etc. No final da execução, a função `grub_main` move o grub para o modo normal. A função `grub_normal_execute` (do `grub-core/normal/main.c` no [código fonte](https://github.com/rhboot/grub2/blob/master/grub-core/normal/main.c)) completa a preparação final e mostra um menu para selecionar o sistema operacional. Quando selecionamos a entrada do menu grub, executa a função `grub_menu_execute_entry`, executando o comando grub `boot` e inicializando o sistema operacional selecionado.
 
-##traduzido ate aqui
-
-As we can read in the kernel boot protocol, the bootloader must read and fill some fields of the kernel setup header, which starts at offset `0x01f1` from the kernel setup code. You may look at the boot [linker script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) to confirm the value of this offset. The kernel header [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) starts from:
+Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de configuração do kernel, que começa no ofsset (deslocamento) `0x01f1` do código de configuração do Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
 
 ```assembly
     .globl hdr
@@ -219,25 +217,25 @@ hdr:
     boot_flag:   .word 0xAA55
 ```
 
-The bootloader must fill this and the rest of the headers (which are only marked as being type `write` in the Linux boot protocol, such as in [this example](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354)) with values either received from the command line or calculated during booting. (We will not go over full descriptions and explanations for all fields of the kernel setup header for now, but we shall do so when discussing how the kernel uses them. You can find a description of all fields in the [boot protocol](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
+O bootloader deve preencher e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354))) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho de configuração do kernel por agora, mas devmos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
 
-As we can see in the kernel boot protocol, memory will be mapped as follows after loading the kernel:
+Como nós podemos ver no protocolo boot do kernel, a memória será mapeada da seguinte maneira após o carregamento do kernel:
 
 ```shell
          | Protected-mode kernel  |
 100000   +------------------------+
          | I/O memory hole        |
 0A0000   +------------------------+
-         | Reserved for BIOS      | Leave as much as possible unused
+         | Reserved for BIOS      | Deixe o máximo sem uso
          ~                        ~
-         | Command line           | (Can also be below the X+10000 mark)
+         | Command line           | (Pode estar abaixo da marca x+10000)
 X+10000  +------------------------+
-         | Stack/heap             | For use by the kernel real-mode code.
+         | Stack/heap             | uso do código em modo real do kernel
 X+08000  +------------------------+
-         | Kernel setup           | The kernel real-mode code.
-         | Kernel boot sector     | The kernel legacy boot sector.
+         | Kernel setup           | código do modo real do kernel.
+         | Kernel boot sector     | O serto boot do kernel legado.
        X +------------------------+
-         | Boot loader            | <- Boot sector entry point 0x7C00
+         | Boot loader            | <- ponto de entrada do setor boot 0x7C00
 001000   +------------------------+
          | Reserved for MBR/BIOS  |
 000800   +------------------------+
@@ -247,6 +245,8 @@ X+08000  +------------------------+
 000000   +------------------------+
 
 ```
+
+##traduzido até aqui
 
 When the bootloader transfers control to the kernel, it starts at:
 
