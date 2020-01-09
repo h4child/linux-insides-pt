@@ -254,7 +254,7 @@ X + sizeof(KernelBootSector) + 1
 
 Onde `X` é o endereço do setor boot do kernel sendo carregado. Em meu caso, `X` é `0x0x10000`, como podemos ver podemos ver no dump de memória:
 
-![kernel first address](images/kernel_first_address.png)
+![Primeiro endereço do kernel](images/kernel_first_address.png)
 
 O bootloader tem agora carregado o kernel linux na memória, preenchido os campos de cabeçalho e saltou para o endereço da memória correspondente. Agora movemos para o código do kernel.
 
@@ -273,9 +273,7 @@ Então verá:
 
 ![Tentar vmlinuz no qemu](images/try_vmlinuz_in_qemu.png)
 
-##traduzido aqui
-
-Actually, the file `header.S` starts with the magic number [MZ](https://en.wikipedia.org/wiki/DOS_MZ_executable) (see image above), the error message that displays and, following that, the [PE](https://en.wikipedia.org/wiki/Portable_Executable) header:
+Realmente, o arquivo `header.S` começa com o número mágico [MZ](https://en.wikipedia.org/wiki/DOS_MZ_executable) (veja imagem acima), a mensagem de erro que é mostrado e seguindo o header [PE](https://en.wikipedia.org/wiki/Portable_Executable)[(similar pt)](https://pt.wikipedia.org/wiki/Portable_Executable):
 
 ```assembly
 #ifdef CONFIG_EFI_STUB
@@ -291,9 +289,9 @@ pe_header:
     .word 0
 ```
 
-It needs this to load an operating system with [UEFI](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface) support. We won't be looking into its inner workings right now but will cover it in upcoming chapters.
+Precisa para carregar um sistema operacional com suporte a [UEFI](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface)[(similar pt)](https://pt.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface). Nós não
 
-The actual kernel setup entry point is:
+O ponto de entrada do kernel é:
 
 ```assembly
 // header.S line 292
@@ -301,7 +299,7 @@ The actual kernel setup entry point is:
 _start:
 ```
 
-The bootloader (GRUB 2 and others) knows about this point (at an offset of `0x200` from `MZ`) and jumps directly to it, despite the fact that `header.S` starts from the `.bstext` section, which prints an error message:
+O bootloader (GRUB 2 e outros) conhece sobre esse ponto (em um offset do `0x200` do `MZ`) e pula diretamente para ele, apesar do fato que `header.S` começa da seção `.bstext`, o qual mostra uma mensagem de erro:
 
 ```
 //
@@ -312,7 +310,7 @@ The bootloader (GRUB 2 and others) knows about this point (at an offset of `0x20
 .bsdata : { *(.bsdata) }
 ```
 
-The kernel setup entry point is:
+O ponto de entrada do kernel é:
 
 ```assembly
     .globl _start
