@@ -203,7 +203,7 @@ Agora que a BIOS tem que escolher um dispositivo para inicializar e transferir o
 
 A função `grub_main` inicializa o console, obtém o endereço base para módulos, defini o dispositivo principal, carrega/analisa o arquivos de configuração grub e etc. No final da execução, a função `grub_main` move o grub para o modo normal. A função `grub_normal_execute` (do `grub-core/normal/main.c` no [código fonte](https://github.com/rhboot/grub2/blob/master/grub-core/normal/main.c)) completa a preparação final e mostra um menu para selecionar o sistema operacional. Quando selecionamos a entrada do menu grub, executa a função `grub_menu_execute_entry`, executando o comando grub `boot` e inicializando o sistema operacional selecionado.
 
-Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho do kernel, que começa no ofsset (deslocamento) `0x01f1` do código de configuração do Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
+Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de inicialização do kernel, que começa no ofsset (deslocamento) `0x01f1` do código do Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
 
 ```assembly
     .globl hdr
@@ -217,7 +217,7 @@ hdr:
     boot_flag:   .word 0xAA55
 ```
 
-O bootloader deve preencher e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354))) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho do kernel por agora, mas devmos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
+O bootloader deve preencher e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354))) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho de inicialição do kernel por agora, mas devemos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
 
 Como nós podemos ver no protocolo boot do kernel, a memória será mapeada da seguinte maneira após o carregamento do kernel:
 
@@ -323,7 +323,9 @@ _start:
     //
 ```
 
-Here we can see a `jmp` instruction opcode (`0xeb`) that jumps to the `start_of_setup-1f` point. In `Nf` notation, `2f`, for example, refers to the local label `2:`. In our case, it's label `1:` that is present right after the jump, and contains the rest of the setup [header](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156). Right after the setup header, we see the `.entrytext` section, which starts at the `start_of_setup` label.
+Aqui nós podemos ver um upcode da intrução `jmp` (`0xeb`) que pula para o ponto `start_of_setup-1f`. Em notação `Nf`, `2f`, por exemplo, refere-se ao local do rótulo `2:`. Nosso caso, é rótulo `1:` que é presente depois de pular e contém o resto do [cabeçalho]((https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156)) de inicialização. Logo depois do cabeçalho, nós vemos a seção `.entrytext`, que começa no rótulo `start_of_setup`.
+
+##traduzido até aqui
 
 This is the first code that actually runs (aside from the previous jump instructions, of course). After the kernel setup part receives control from the bootloader, the first `jmp` instruction is located at the `0x200` offset from the start of the kernel real mode, i.e., after the first 512 bytes. This can be seen in both the Linux kernel boot protocol and the GRUB 2 source code:
 
