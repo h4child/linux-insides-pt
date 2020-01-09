@@ -325,15 +325,14 @@ _start:
 
 Aqui nós podemos ver um upcode da intrução `jmp` (`0xeb`) que pula para o ponto `start_of_setup-1f`. Em notação `Nf`, `2f`, por exemplo, refere-se ao local do rótulo `2:`. Nosso caso, é rótulo `1:` que é presente depois de pular e contém o resto do [cabeçalho]((https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156)) de inicialização. Logo depois do cabeçalho, nós vemos a seção `.entrytext`, que começa no rótulo `start_of_setup`.
 
-##traduzido até aqui
-
-This is the first code that actually runs (aside from the previous jump instructions, of course). After the kernel setup part receives control from the bootloader, the first `jmp` instruction is located at the `0x200` offset from the start of the kernel real mode, i.e., after the first 512 bytes. This can be seen in both the Linux kernel boot protocol and the GRUB 2 source code:
+Esse é o primeiro código que realmente executa (além da instrução jump anteriormente, claro). Depois a inicialização do kernel receber o controle do bootloader, a primeira instrução `jmp` é localizada no offset `0x200` do começo do modo real do kernel, ou seja, depois dos primeiros 512 bytes. Esse pode ser visto em ambos o protocolo boot do kernel linux e o código fonte do GRUB 2:
 
 ```C
 segment = grub_linux_real_target >> 4;
 state.gs = state.fs = state.es = state.ds = state.ss = segment;
 state.cs = segment + 0x20;
 ```
+##traduzido até aqui
 
 In my case, the kernel is loaded at the physical address `0x10000`. This means that segment registers have the following values after kernel setup starts:
 
