@@ -203,7 +203,7 @@ Agora que a BIOS tem que escolher um dispositivo para inicializar e transferir o
 
 A função `grub_main` inicializa o console, obtém o endereço base para módulos, defini o dispositivo principal, carrega/analisa o arquivos de configuração grub e etc. No final da execução, a função `grub_main` move o grub para o modo normal. A função `grub_normal_execute` (do `grub-core/normal/main.c` no [código fonte](https://github.com/rhboot/grub2/blob/master/grub-core/normal/main.c)) completa a preparação final e mostra um menu para selecionar o sistema operacional. Quando selecionamos a entrada do menu grub, executa a função `grub_menu_execute_entry`, executando o comando grub `boot` e inicializando o sistema operacional selecionado.
 
-Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de configuração do kernel, que começa no ofsset (deslocamento) `0x01f1` do código de configuração do Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
+Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho do kernel, que começa no ofsset (deslocamento) `0x01f1` do código de configuração do Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
 
 ```assembly
     .globl hdr
@@ -217,7 +217,7 @@ hdr:
     boot_flag:   .word 0xAA55
 ```
 
-O bootloader deve preencher e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354))) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho de configuração do kernel por agora, mas devmos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
+O bootloader deve preencher e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354))) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho do kernel por agora, mas devmos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
 
 Como nós podemos ver no protocolo boot do kernel, a memória será mapeada da seguinte maneira após o carregamento do kernel:
 
@@ -246,34 +246,34 @@ X+08000  +------------------------+
 
 ```
 
-##traduzido até aqui
-
-When the bootloader transfers control to the kernel, it starts at:
+Quando o boorloader transfere controle para o kernel, começa no:
 
 ```
 X + sizeof(KernelBootSector) + 1
 ```
 
-where `X` is the address of the kernel boot sector being loaded. In my case, `X` is `0x10000`, as we can see in a memory dump:
+Onde `X` é o endereço do setor boot do kernel sendo carregado. Em meu caso, `X` é `0x0x10000`, como podemos ver podemos ver no dump de memória:
 
 ![kernel first address](images/kernel_first_address.png)
 
-The bootloader has now loaded the Linux kernel into memory, filled the header fields, and then jumped to the corresponding memory address. We now move directly to the kernel setup code.
+O bootloader tem agora carregado o kernel linux na memória, preenchido os campos de cabeçalho e saltou para o endereço da memória correspondente. Agora movemos para o código do kernel.
 
-The Beginning of the Kernel Setup Stage
+O estágio da inicialização do kernel
 --------------------------------------------------------------------------------
 
-Finally, we are in the kernel! Technically, the kernel hasn't run yet. First, the kernel setup part must configure stuff such as the decompressor and some memory management related things, to name a few. After all these things are done, the kernel setup part will decompress the actual kernel and jump to it. Execution of the setup part starts from [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) at the [_start](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L292) symbol.
+Finalmente, nós estamos no kernel! Tecnicamente, o kernel não está executando ainda. Primeiro, uma parte do kernel deve configurar coisas tal como descompactador e algumas coisas relacionadas a gerenciamento de memória. Depoisde que todas essas coisas foram feitas, uma parte do kernel vai descompactar o atual  kernel e pular para ele. Execução começa do [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) no símbolo [_start](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L292).
 
-It may look a bit strange at first sight, as there are several instructions before it. A long time ago, the Linux kernel had its own bootloader. Now, however, if you run, for example,
+Pode aparecer um pouco estranho a primeira vista, como são várias instruções antes disso. Tempos atrás, o kernel linux tinha seu próprio bootloader. Agora, tanto faz, se você executar, por exemplo:
 
 ```
 qemu-system-x86_64 vmlinuz-3.18-generic
 ```
 
-then you will see:
+Então verá:
 
-![Try vmlinuz in qemu](images/try_vmlinuz_in_qemu.png)
+![Tentar vmlinuz no qemu](images/try_vmlinuz_in_qemu.png)
+
+##traduzido aqui
 
 Actually, the file `header.S` starts with the magic number [MZ](https://en.wikipedia.org/wiki/DOS_MZ_executable) (see image above), the error message that displays and, following that, the [PE](https://en.wikipedia.org/wiki/Portable_Executable) header:
 
