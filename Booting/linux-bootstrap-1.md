@@ -390,15 +390,15 @@ Quase todo código é para inicializar o ambiente (environment) da linguagem C e
     je      2f
 ```
 
+Isso pode levar a 3 cenários diferentes:
+
+* `ss` tem um valor válido `0x1000` (como todos os registros de segmento além do `cs`)
+* `ss` é inválido e a bandeira (flag) `CAN_USE_HEAP` é definido (veja abaixo)
+* `ss` é inválido e a bandeira (flag) `CAN_USE_HEAP` não é definido (veja abaixo)
+
+Vamos inspecionar todos os três cénário:
+
 ##traduzido até aqui
-
-This can lead to 3 different scenarios:
-
-* `ss` has a valid value `0x1000` (as do all the other segment registers besides `cs`)
-* `ss` is invalid and the `CAN_USE_HEAP` flag is set     (see below)
-* `ss` is invalid and the `CAN_USE_HEAP` flag is not set (see below)
-
-Let's look at all three of these scenarios in turn:
 
 * `ss` has a correct address (`0x1000`). In this case, we go to label [2](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L589):
 
