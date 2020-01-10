@@ -342,17 +342,18 @@ cs = 0x1020
 
 Depois o pulo para `start_of_setup`, o kernel precisa fazer o seguinte:
 
-* Make sure that all segment register values are equal
-* Set up a correct stack, if needed
-* Set up [bss](https://en.wikipedia.org/wiki/.bss)
-* Jump to the C code in [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c)
+* Verifique se todos os valores de registro de segmento são iguais
+* Construir uma pilha correta, se necessário
+* Construir [bss](https://en.wikipedia.org/wiki/.bss)
+* Pular para o código C em [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c)
 
-Let's look at the implementation.
+Vamos reparar na implementação.
 
-Aligning the Segment Registers 
+Alinhamento dos registros de segmento
 --------------------------------------------------------------------------------
 
-First of all, the kernel ensures that the `ds` and `es` segment registers point to the same address. Next, it clears the direction flag using the `cld` instruction:
+Primeiro de tudo, o kernel gerante que os registradores de segmento `ds` e `es` apontem para o mesmo segmento. Próximo, limpa a flag (bandeira) de direção usando a instrução `cld`:
+
 
 ```assembly
     movw    %ds, %ax
@@ -360,7 +361,9 @@ First of all, the kernel ensures that the `ds` and `es` segment registers point 
     cld
 ```
 
-As I wrote earlier, `grub2` loads kernel setup code at address `0x10000` by default and `cs` at `0x1020` because execution doesn't start from the start of the file, but from the jump here:
+Como eu escrevi mais cedo, `grub2` carrega o código do kernel no endereço `0x10000` por padrão e `cs` no `0x1020` porquê a execução não começa do start do arquivo, mas do jump aqui:
+
+##traduzido até aqui
 
 ```assembly
 _start:
