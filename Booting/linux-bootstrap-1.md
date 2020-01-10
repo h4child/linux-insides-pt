@@ -332,16 +332,15 @@ segment = grub_linux_real_target >> 4;
 state.gs = state.fs = state.es = state.ds = state.ss = segment;
 state.cs = segment + 0x20;
 ```
-##traduzido até aqui
 
-In my case, the kernel is loaded at the physical address `0x10000`. This means that segment registers have the following values after kernel setup starts:
+Em meu caso, o kernel é carregado no endereço físico `0x10000`. Isso significa que o registro de segmento tem o seguinte valores depois de iniciar o kernel:
 
 ```
 gs = fs = es = ds = ss = 0x1000
 cs = 0x1020
 ```
 
-After the jump to `start_of_setup`, the kernel needs to do the following:
+Depois o pulo para `start_of_setup`, o kernel precisa fazer o seguinte:
 
 * Make sure that all segment register values are equal
 * Set up a correct stack, if needed
