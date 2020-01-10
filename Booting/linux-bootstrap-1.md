@@ -354,7 +354,6 @@ Alinhamento dos registros de segmento
 
 Primeiro de tudo, o kernel gerante que os registradores de segmento `ds` e `es` apontem para o mesmo segmento. Próximo, limpa a flag (bandeira) de direção usando a instrução `cld`:
 
-
 ```assembly
     movw    %ds, %ax
     movw    %ax, %es
@@ -363,15 +362,13 @@ Primeiro de tudo, o kernel gerante que os registradores de segmento `ds` e `es` 
 
 Como eu escrevi mais cedo, `grub2` carrega o código do kernel no endereço `0x10000` por padrão e `cs` no `0x1020` porquê a execução não começa do start do arquivo, mas do jump aqui:
 
-##traduzido até aqui
-
 ```assembly
 _start:
     .byte 0xeb
     .byte start_of_setup-1f
 ```
 
-which is at a `512` byte offset from [4d 5a](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L46). We also need to align `cs` from `0x1020` to `0x1000`, as well as all other segment registers. After that, we set up the stack:
+Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L46). Nós precisamos alinhar `cs` do `0x1020` para `0x1000`, como todos outros registros de segmento. Depois que, nós definimos a stack:
 
 ```assembly
     pushw   %ds
@@ -379,12 +376,12 @@ which is at a `512` byte offset from [4d 5a](https://github.com/torvalds/linux/b
     lretw
 ```
 
-which pushes the value of `ds` to the stack, followed by the address of the [6](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L602) label and executes the `lretw` instruction. When the `lretw` instruction is called, it loads the address of label `6` into the [instruction pointer](https://en.wikipedia.org/wiki/Program_counter) register and loads `cs` with the value of `ds`. Afterward, `ds` and `cs` will have the same values.
+Empurrar ([push](https://pt.wikibooks.org/wiki/Programar_em_Assembly_com_GAS/Instru%C3%A7%C3%B5es#Instru%C3%A7%C3%B5es_para_manipula%C3%A7%C3%A3o_de_stack)) o valor de `ds` para a stack, seguido pelo endereço do rótulo [6](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L602) e executa a instrução `lretw`. Quando a instrução `lretw` é chamado, carrega o endereço do rótulo `6` no registro de [ponteiro de instrução (PI)](https://en.wikipedia.org/wiki/Program_counter) e carrega `cs` como o valor de `ds`. Depois, `ds` e `cs` vai ter os mesmos valores.
 
-Stack Setup
+Operação de pilha
 --------------------------------------------------------------------------------
 
-Almost all of the setup code is for preparing the C language environment in real mode. The next [step](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L575) is checking the `ss` register's value and setting up a correct stack if `ss` is wrong:
+Quase todo código é para inicializar o ambiente (environment) da linguagem C em modo real. O próximo [passo](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L575) esta checando o valor do registro `ss` e configurar uma pilha correta se `ss` estiver errado: 
 
 ```assembly
     movw    %ss, %dx
@@ -392,6 +389,8 @@ Almost all of the setup code is for preparing the C language environment in real
     movw    %sp, %dx
     je      2f
 ```
+
+##traduzido até aqui
 
 This can lead to 3 different scenarios:
 
