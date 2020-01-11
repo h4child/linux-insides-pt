@@ -6,7 +6,7 @@ Do bootloader ao kernel
 
 Se você leu as minhas [postagens anteriores](https://0xax.github.io/categories/assembler/), você pode ter notado que eu estive envolvido com programação de baixo nível por algum tempo. Eu escrevi algumas postagem sobre programando assembly para Linux `x86_64` e no mesmo tempo, comecei a mergulhar no código fonte do kernel Linux.
 
-Eu tenho um grande interesse em entender como as coisas funcionam em baixo nível, como os programas executam no computador, como são localizados na memória, como o kernel administra os processos e memória, como a pilha de rede funcionam em baixo nível e muitas outras coisas. Então, eu decidi escrever uma série de postagens sobre kernel Linux para arquitetura **x86_64**.
+Eu tenho um grande interesse em entender como as coisas funcionam em baixo nível, como os programas executam no computador, como são localizados na memória, como o kernel administra os processos e memória, como a stack (pilha) de rede funcionam em baixo nível e muitas outras coisas. Então, eu decidi escrever uma série de postagens sobre kernel Linux para arquitetura **x86_64**.
 
 Note que e não sou um profisional kernel hacker e eu não escrevo código para o kernel no trabalho. É apenas um hobby. Eu apenas gosto das coisas em baixo nível e é interessante para eu ver como essas coisas funcionam. Então se você perceber algo confuso ou se você ter qualquer perguntas/observações, me avise no twitter [autor 0xAX](https://twitter.com/0xAX) [tradutor rodgger](https://twitter.com/rodgger1), 
 
@@ -343,7 +343,7 @@ cs = 0x1020
 Depois o pulo para `start_of_setup`, o kernel precisa fazer o seguinte:
 
 * Verifique se todos os valores de registro de segmento são iguais
-* Construir uma pilha correta, se necessário
+* Construir uma stack, se necessário
 * Construir [bss](https://en.wikipedia.org/wiki/.bss)
 * Pular para o código C em [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c)
 
@@ -368,7 +368,7 @@ _start:
     .byte start_of_setup-1f
 ```
 
-Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L46). Nós precisamos alinhar `cs` do `0x1020` para `0x1000`, como todos outros registros de segmento. Depois que, nós definimos a stack:
+Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L46). Nós precisamos alinhar `cs` do `0x1020` para `0x1000`, como todos outros registros de segmento. Depois que, nós definimos a  (pilha):
 
 ```assembly
     pushw   %ds
@@ -378,10 +378,10 @@ Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob
 
 Empurrar ([push](https://pt.wikibooks.org/wiki/Programar_em_Assembly_com_GAS/Instru%C3%A7%C3%B5es#Instru%C3%A7%C3%B5es_para_manipula%C3%A7%C3%A3o_de_stack)) o valor de `ds` para a stack, seguido pelo endereço do rótulo [6](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L602) e executa a instrução `lretw`. Quando a instrução `lretw` é chamado, carrega o endereço do rótulo `6` no registro de [ponteiro de instrução (PI)](https://en.wikipedia.org/wiki/Program_counter) e carrega `cs` como o valor de `ds`. Depois, `ds` e `cs` vai ter os mesmos valores.
 
-Operação de pilha
+Operação de stack (pilha)
 --------------------------------------------------------------------------------
 
-Quase todo código é para inicializar o ambiente (environment) da linguagem C em modo real. O próximo [passo](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L575) esta checando o valor do registro `ss` e configurar uma pilha correta se `ss` estiver errado: 
+Quase todo código é para inicializar o ambiente (environment) da linguagem C em modo real. O próximo [passo](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L575) esta checando o valor do registro `ss` e configurar uma stack correta se `ss` estiver errado: 
 
 ```assembly
     movw    %ss, %dx
@@ -398,9 +398,7 @@ Isso pode levar a 3 cenários diferentes:
 
 Vamos inspecionar todos os três cénário:
 
-##traduzido até aqui
-
-* `ss` has a correct address (`0x1000`). In this case, we go to label [2](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L589):
+* `ss` tem um endereço correta (`0x1000`). Neste caso, nós vamos para rótulo [2](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L589):
 
 ```assembly
 2:  andw    $~3, %dx
@@ -411,11 +409,12 @@ Vamos inspecionar todos os três cénário:
     sti
 ```
 
-Here we set the alignment of `dx` (which contains the value of `sp` as given by the bootloader) to `4` bytes and check if it is zero. If it is, we set `dx` to `0xfffc` (The last 4-byte aligned address in a 64KB segment). If it is not zero, we continue to use the value of `sp` given by the bootloader (`0xf7f4` in my case). Afterwards, we put the value of `ax` (`0x1000`) into `ss`. We now have a correct stack:
+Aqui nós definimos do `dx` (que contém o valor do `sp` fornecido pelo bootloader) para `4` bytes e checa se é zero. Se é, definimos para o endereço de alinhamento `0xfffc` (o último 4-byte alinha) em segmento 64 KiB). Se não é zero, continua usar o valor de `sp` dado pelo bootloader (`0xf7f4` no meu caso). Mais tarde, colocaremos o valor de `ax` (0x1000) no `ss`. Agora temos uma stack correta:
 
-![stack](images/stack1.png)
+![stack (Pilha)](images/stack1.png)
 
-* The second scenario, (`ss` != `ds`). First, we put the value of [_end](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) (the address of the end of the setup code) into `dx` and check the `loadflags` header field using the `testb` instruction to see whether we can use the heap. [loadflags](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L320) is a bitmask header defined as:
+* O segundo cenário, (`ss` != `ds`). Primeiro, colocamos o valor de [_end](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) (o endereço da finalização do código) em `dx` e checar o campo cabeçalho `loadflags` usando a instrução `testb` ver se nós podemos usar o heap. [loadflags](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L320) é um cabeçalho bitmask definido como:
+
 
 ```C
 #define LOADED_HIGH     (1<<0)
@@ -424,7 +423,7 @@ Here we set the alignment of `dx` (which contains the value of `sp` as given by 
 #define CAN_USE_HEAP    (1<<7)
 ```
 
-and as we can read in the boot protocol:
+e podemos ler o protocolo de boot:
 
 ```
 Field name: loadflags
@@ -437,23 +436,25 @@ Field name: loadflags
     functionality will be disabled.
 ```
 
-If the `CAN_USE_HEAP` bit is set, we put `heap_end_ptr` into `dx` (which points to `_end`) and add `STACK_SIZE` (the minimum stack size, `1024` bytes) to it. After this, if `dx` is not carried (it will not be carried, `dx = _end + 1024`), jump to label `2` (as in the previous case) and make a correct stack.
+Se o bit `CAN_USE_HEAP` é definido, nós colocamos `heap_end_ptr` em `dx` (que aponta para `_end`) e adiciona `STACK_SIZE` (o mínimo tamanho de stack, `1024 bytes`). Depois disso, se `dx` não é carregado (não é carregado, `dx = _end + 1024`), pula para o rórulo `2` (como no caso anterior) e faz stack.
 
-![stack](images/stack2.png)
+![stack (pilha)](images/stack2.png)
 
-* When `CAN_USE_HEAP` is not set, we just use a minimal stack from `_end` to `_end + STACK_SIZE`:
+* Quando `CAN_USE_HEAP` não é definido, nós usamos stack mínimo do `_end` para `_end + STACK_SIZE`:
 
-![minimal stack](images/minimal_stack.png)
+![stack (pilha) mínimo](images/minimal_stack.png)
 
-BSS Setup
+Operação BSS
 --------------------------------------------------------------------------------
 
-The last two steps that need to happen before we can jump to the main C code are setting up the [BSS](https://en.wikipedia.org/wiki/.bss) area and checking the "magic" signature. First, signature checking:
+Os dois últimos passos que precisa acontecer antes de pular para a main no código C configurando a área [BSS](https://en.wikipedia.org/wiki/.bss) e checando a assinatura mágica. Primeiro, checando a assinatura:
 
 ```assembly
     cmpl    $0x5a5aaa55, setup_sig
     jne     setup_bad
 ```
+
+##traduzido até aqui
 
 This simply compares the [setup_sig](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) with the magic number `0x5a5aaa55`. If they are not equal, a fatal error is reported.
 
