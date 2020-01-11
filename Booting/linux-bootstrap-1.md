@@ -67,7 +67,7 @@ Ok, agora nós conhecemos um pouco sobre modo real e endereçamento de memória.
 
 O registro `CS` consiste de duas partes: o seletor de segmento visível e o endereço base oculto. Enquanto o endereço base é normalmente formato multiplicando o valor do seletor de segmento por 16, durante o reset no hardware o selector de segmento no registro CS é carregado com `0xF000` e o endereço base é carregado com `0xFFFF0000`. O processador usa essa base de endereço especial até  `CS` mudar.
 
-O endereço inicial é formato adicionando o endereço base ao valor no registro IP:
+O endereço inicial é formato adicionando o endereço base ao valor no registro EIP:
 
 ```python
 >>> 0xffff0000 + 0xfff0
