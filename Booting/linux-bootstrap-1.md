@@ -24,7 +24,7 @@ De qualquer forma, se você esta apenas começando aprender ferramentas, eu tent
 Eu comecei a escrever estas postagens na versão `3.18` do kernel Linux, e muitas coisas mudaram deste aquele tempo. Se houver mudanças, eu atualizarei a postagens adequadamente.
 
 
-O Mágico Botão Power, o que acontece depois?
+O Mágico Botão Power(ligar), o que acontece depois?
 --------------------------------------------------------------------------------
 
 Embora isso é uma série de postagens sobre kernel linux, não comearemos diretamente no código do kernel. Assim que pressionou o botão mágico power no laptop ou computador desktop, começa funcionar. A placa-mãe envia um sinal para [power suply](https://en.wikipedia.org/wiki/Power_supply)[(similar pt)](https://pt.wikipedia.org/wiki/Fonte_de_alimentação) e tenta iniciar a CPU.A CPU reseta todos os dados no registro e valor predefinido para cada um deles
@@ -203,7 +203,7 @@ Agora que a BIOS tem que escolher um dispositivo para inicializar e transferir o
 
 A função `grub_main` inicializa o console, obtém o endereço base para módulos, defini o dispositivo principal, carrega/analisa o arquivos de configuração grub e etc. No final da execução, a função `grub_main` move o grub para o modo normal. A função `grub_normal_execute` (do `grub-core/normal/main.c` no [código fonte](https://github.com/rhboot/grub2/blob/master/grub-core/normal/main.c)) completa a preparação final e mostra um menu para selecionar o sistema operacional. Quando selecionamos a entrada do menu grub, executa a função `grub_menu_execute_entry`, executando o comando grub `boot` e inicializando o sistema operacional selecionado.
 
-Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de inicialização do kernel, que começa no ofsset (deslocamento) `0x01f1` do código do Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
+Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de inicialização do kernel, que começa no ofsset (deslocamento) `0x01f1` do código de inicialização Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
 
 ```assembly
     .globl hdr
@@ -256,12 +256,12 @@ Onde `X` é o endereço do setor boot do kernel sendo carregado. Em meu caso, `X
 
 ![Primeiro endereço do kernel](images/kernel_first_address.png)
 
-O bootloader tem agora carregado o kernel linux na memória, preenchido os campos de cabeçalho e saltou para o endereço da memória correspondente. Agora movemos para o código do kernel.
+O bootloader tem agora carregado o kernel linux na memória, preenchido os campos de cabeçalho e saltou para o endereço da memória correspondente. Agora movemos para o código de inicialização do kernel linux.
 
 O estágio da inicialização do kernel
 --------------------------------------------------------------------------------
 
-Finalmente, nós estamos no kernel! Tecnicamente, o kernel não está executando ainda. Primeiro, uma parte do kernel deve configurar coisas tal como descompactador e algumas coisas relacionadas a gerenciamento de memória. Depoisde que todas essas coisas foram feitas, uma parte do kernel vai descompactar o atual  kernel e pular para ele. Execução começa do [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) no símbolo [_start](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L292).
+Finalmente, nós estamos no kernel! Tecnicamente, o kernel não está executando ainda. Primeiramente, uma parte da inicialização do kernel deve configurar coisas tal como descompactador e algumas coisas relacionadas a gerenciamento de memória. Depois de todas essas coisas foram feitas, uma parte da inicialização do kernel vai descompactar o atual  kernel e pular para ele. Execução da parte da inicialização começa do [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) no símbolo [_start](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L292).
 
 Pode aparecer um pouco estranho a primeira vista, como são várias instruções antes disso. Tempos atrás, o kernel linux tinha seu próprio bootloader. Agora, tanto faz, se você executar, por exemplo:
 
@@ -323,7 +323,7 @@ _start:
     //
 ```
 
-Aqui nós podemos ver um upcode da intrução `jmp` (`0xeb`) que pula para o ponto `start_of_setup-1f`. Em notação `Nf`, `2f`, por exemplo, refere-se ao local do rótulo `2:`. Nosso caso, é rótulo `1:` que é presente depois de pular e contém o resto do [cabeçalho]((https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156)) de inicialização. Logo depois do cabeçalho, nós vemos a seção `.entrytext`, que começa no rótulo `start_of_setup`.
+Aqui nós podemos ver um upcode da intrução `jmp` (`0xeb`) que pula para o ponto `start_of_setup-1f`. Em notação `Nf`, `2f`, por exemplo, refere-se ao local do rótulo `2:`. Nosso caso, é rótulo `1:` que é presente depois de pular e contém o resto do [cabeçalho de inicialização]((https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156)) de inicialização. Logo depois do cabeçalho, nós vemos a seção `.entrytext`, que começa no rótulo `start_of_setup`.
 
 Esse é o primeiro código que realmente executa (além da instrução jump anteriormente, claro). Depois a inicialização do kernel receber o controle do bootloader, a primeira instrução `jmp` é localizada no offset `0x200` do começo do modo real do kernel, ou seja, depois dos primeiros 512 bytes. Esse pode ser visto em ambos o protocolo boot do kernel linux e o código fonte do GRUB 2:
 
@@ -360,7 +360,7 @@ Primeiro de tudo, o kernel gerante que os registradores de segmento `ds` e `es` 
     cld
 ```
 
-Como eu escrevi mais cedo, `grub2` carrega o código do kernel no endereço `0x10000` por padrão e `cs` no `0x1020` porquê a execução não começa do start do arquivo, mas do jump aqui:
+Como eu escrevi mais cedo, `grub2` carrega o código de inicialização do kernel no endereço `0x10000` por padrão e `cs` no `0x1020` porquê a execução não começa do start do arquivo, mas do jump aqui:
 
 ```assembly
 _start:
@@ -378,7 +378,7 @@ Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob
 
 Empurrar ([push](https://pt.wikibooks.org/wiki/Programar_em_Assembly_com_GAS/Instru%C3%A7%C3%B5es#Instru%C3%A7%C3%B5es_para_manipula%C3%A7%C3%A3o_de_stack)) o valor de `ds` para a stack, seguido pelo endereço do rótulo [6](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L602) e executa a instrução `lretw`. Quando a instrução `lretw` é chamado, carrega o endereço do rótulo `6` no registro de [ponteiro de instrução (PI)](https://en.wikipedia.org/wiki/Program_counter) e carrega `cs` como o valor de `ds`. Depois, `ds` e `cs` vai ter os mesmos valores.
 
-Operação de stack (pilha)
+inicialização do stack (pilha)
 --------------------------------------------------------------------------------
 
 Quase todo código é para inicializar o ambiente (environment) da linguagem C em modo real. O próximo [passo](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L575) esta checando o valor do registro `ss` e configurar uma stack correta se `ss` estiver errado: 
@@ -444,7 +444,7 @@ Se o bit `CAN_USE_HEAP` é definido, nós colocamos `heap_end_ptr` em `dx` (que 
 
 ![stack (pilha) mínimo](images/minimal_stack.png)
 
-Operação BSS
+Inicialização do BSS
 --------------------------------------------------------------------------------
 
 Os dois últimos passos que precisa acontecer antes de pular para a main no código C configurando a área [BSS](https://en.wikipedia.org/wiki/.bss) e checando a assinatura mágica. Primeiro, checando a assinatura:
@@ -454,13 +454,11 @@ Os dois últimos passos que precisa acontecer antes de pular para a main no cód
     jne     setup_bad
 ```
 
-##traduzido até aqui
+Isso simplesmente compara o [setup_sig](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) com o número mágico `0x5a5aaa55`. Se eles não são iguais, um erro fatal é reportado.
 
-This simply compares the [setup_sig](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) with the magic number `0x5a5aaa55`. If they are not equal, a fatal error is reported.
+Se o número mágico combinar, sabendo definir do registros de segmento correto e uma pilha, nós apenas precisamos definir a seção BSS antes de pular no código C.
 
-If the magic number matches, knowing we have a set of correct segment registers and a stack, we only need to set up the BSS section before jumping into the C code.
-
-The BSS section is used to store statically allocated, uninitialized data. Linux carefully ensures this area of memory is first zeroed using the following code:
+A seção BSS é usado para armazenar estaticamente, dados não inicializado. Linux cuidadosamente garante essa área da memória primeiro seja zerado usando o seguinte código:
 
 ```assembly
     movw    $__bss_start, %di
@@ -471,40 +469,42 @@ The BSS section is used to store statically allocated, uninitialized data. Linux
     rep; stosl
 ```
 
-First, the [__bss_start](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) address is moved into `di`. Next, the `_end + 3` address (+3 - aligns to 4 bytes) is moved into `cx`. The `eax` register is cleared (using the `xor` instruction), and the bss section size (`cx - di`) is calculated and put into `cx`. Then, `cx` is divided by four (the size of a 'word'), and the `stosl` instruction is used repeatedly, storing the value of `eax` (zero) into the address pointed to by `di`, automatically increasing `di` by four, repeating until `cx` reaches zero. The net effect of this code is that zeros are written through all words in memory from `__bss_start` to `_end`:
+Primeiramente, o endereço [__bss_start](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) é movido para `di`. E sequida, o endereço `_end + 3` (+3 - alinhar to 4 bytes) é movido para `cx`. O registro `eax` é zerado (usando a instrução xor) e o tamanho da seção bss (`cx - di`) é calculado e colocar no `cx`. Então, `cx` é dividido por 4 (o tamanho de uma 'word') e a instrução `stosl` é usado repetidamente, armazenando o valor de `eax` (zero) no endereço apontado por `di`, automaticamente encrementado `di` por 4, repetidamente até `cx` atingir zero. O efeito deste código é que zeros são escrito através de todas 'word' na memória do `__bss_start` ao `_end`:
 
 ![bss](images/bss.png)
 
-Jump to main
+Pular para main
 --------------------------------------------------------------------------------
 
-That's all! We have the stack and BSS, so we can jump to the `main()` C function:
+Isso é tudo! Nós teremos a pilha e BSS, então pulomos para a função  `main()` da linguagem C:
 
 ```assembly
     calll main
 ```
 
-The `main()` function is located in [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). You can read about what this does in the next part.
+A função `main()`  é localizado em [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). Você pode ler sobre o que isso faz na próxima parte.
 
-Conclusion
+Conclusão
 --------------------------------------------------------------------------------
 
-This is the end of the first part about Linux kernel insides. If you have questions or suggestions, ping me on Twitter [0xAX](https://twitter.com/0xAX), drop me an [email](anotherworldofworld@gmail.com), or just create an [issue](https://github.com/0xAX/linux-internals/issues/new). In the next part, we will see the first C code that executes in the Linux kernel setup, the implementation of memory routines such as `memset`, `memcpy`, `earlyprintk`, early console implementation and initialization, and much more.
+Essa é o final da primeira parte sobre Linux kernel innsides. Se você tem pergunta ou sugestão, me envie no twitter [rodgger1](https://twitter.com/rodgger1), mande um [email](rodggerbruno@gmail.com) ou crie uma [issue](https://github.com/rodggerbr/linux-insides/issues/new). Na próxima parte iremos ver o primeiro o primeiro código em C que executa na inicialização do kernel, a implementação da rotina de memória tal como `memset`, `memcpy`, `earlyprintk` e muito mais.
+
+**Se você encontrou qualquer erro, por favor me envie um PR (pull request) para [traduçã do linux-insides](https://github.com/rodggerbr/linux-insides).**
 
 **Please note that English is not my first language and I am really sorry for any inconvenience. If you find any mistakes please send me PR to [linux-insides](https://github.com/0xAX/linux-internals).**
 
 Links
 --------------------------------------------------------------------------------
 
-  * [Intel 80386 programmer's reference manual 1986](http://css.csail.mit.edu/6.858/2014/readings/i386.pdf)
-  * [Minimal Boot Loader for Intel® Architecture](https://www.cs.cmu.edu/~410/doc/minimal_boot.pdf)
-  * [Minimal Boot Loader in Assembler with comments](https://github.com/Stefan20162016/linux-insides-code/blob/master/bootloader.asm)
+  * [Intel 80386 manual referência para programadores 1986](http://css.csail.mit.edu/6.858/2014/readings/i386.pdf)
+  * [Carregador boot mínimo para arquitetura Intel®](https://www.cs.cmu.edu/~410/doc/minimal_boot.pdf)
+  * [Carregador boot mínimo em assembler com comentário](https://github.com/Stefan20162016/linux-insides-code/blob/master/bootloader.asm)
   * [8086](https://en.wikipedia.org/wiki/Intel_8086)
   * [80386](https://en.wikipedia.org/wiki/Intel_80386)
   * [Reset vector](https://en.wikipedia.org/wiki/Reset_vector)
-  * [Real mode](https://en.wikipedia.org/wiki/Real_mode)
-  * [Linux kernel boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt)
-  * [coreboot developer manual](https://www.coreboot.org/Developer_Manual)
-  * [Ralf Brown's Interrupt List](http://www.ctyme.com/intr/int.htm)
-  * [Power supply](https://en.wikipedia.org/wiki/Power_supply)
-  * [Power good signal](https://en.wikipedia.org/wiki/Power_good_signal)
+  * [modo real](https://en.wikipedia.org/wiki/Real_mode)
+  * [Protocolo boot do kernel linux](https://www.kernel.org/doc/Documentation/x86/boot.txt)
+  * [Manual coreboot para desenvolvedores](https://www.coreboot.org/Developer_Manual)
+  * [List de interrupções de Ralf Brown](http://www.ctyme.com/intr/int.htm)
+  * [fonte de energia](https://en.wikipedia.org/wiki/Power_supply)
+  * [bom sinal de energia](https://en.wikipedia.org/wiki/Power_good_signal)
