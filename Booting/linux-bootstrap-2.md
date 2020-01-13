@@ -1,24 +1,24 @@
-Kernel booting process. Part 2.
+Processo de inicialização do kernel Part 2.
 ================================================================================
 
-First steps in the kernel setup
+Primeiro passo na inicialização do kernel
 --------------------------------------------------------------------------------
 
-We started to dive into the linux kernel's insides in the previous [part](linux-bootstrap-1.md) and saw the initial part of the kernel setup code. We stopped at the first call to the `main` function (which is the first function written in C) from [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
+Nós começamos mergulhar dentro do kernel linux no [parte anterior](linux-bootstrap-1.md) e vimos a parte inicial da inicialização do código do kernel. Nós paramos na chamada da função `main` (é o primeira função escrita em C) do [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
 
-In this part, we will continue to research the kernel setup code and go over
-* what `protected mode` is,
-* the transition into it,
-* the initialization of the heap and the console,
-* memory detection, CPU validation and keyboard initialization
-* and much much more.
+Nesta parte, nós continuaremos inspecionar o código de inicialização do kernel e revisando
+* O que o `modo protegido` é
+* a transição para ele
+* a inicialização do heap e o console
+* detectação de memória, validação CPU e a inicialização do teclado
+* e muito, muito mais.
 
-So, let's go ahead.
+Então, vamos ir adiante.
 
-Protected mode
+Modo protegido
 --------------------------------------------------------------------------------
 
-Before we can move to the native Intel64 [Long Mode](http://en.wikipedia.org/wiki/Long_mode), the kernel must switch the CPU into protected mode.
+Antes podemos mover para o [modo longo](http://en.wikipedia.org/wiki/Long_mode) no Intel64 nativo, o kernel deve interromper CPU no modo protegido.
 
 What is [protected mode](https://en.wikipedia.org/wiki/Protected_mode)? Protected mode was first added to the x86 architecture in 1982 and was the main mode of Intel processors from the [80286](http://en.wikipedia.org/wiki/Intel_80286) processor until Intel 64 and long mode came.
 
