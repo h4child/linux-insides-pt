@@ -13,7 +13,7 @@ Nesta parte, nós continuaremos inspecionar o código de inicialização do kern
 * detectação de memória, validação CPU e a inicialização do teclado
 * e muito, muito mais.
 
-Então, vamos ir adiante.
+Então, vamos adiante.
 
 Modo protegido
 --------------------------------------------------------------------------------
