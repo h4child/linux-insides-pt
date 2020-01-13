@@ -20,7 +20,8 @@ Modo protegido
 
 Antes podemos mover para o [modo longo](http://en.wikipedia.org/wiki/Long_mode) no Intel64 nativo, o kernel deve interromper CPU no modo protegido.
 
-What is [protected mode](https://en.wikipedia.org/wiki/Protected_mode)? Protected mode was first added to the x86 architecture in 1982 and was the main mode of Intel processors from the [80286](http://en.wikipedia.org/wiki/Intel_80286) processor until Intel 64 and long mode came.
+O que é [modo protegido](https://en.wikipedia.org/wiki/Protected_mode)?
+Modo protegido foi o adicionado primeiro na arquitetura x86 em 1982 e foi o principal modo do processador [80286](http://en.wikipedia.org/wiki/Intel_80286) da Intel até Intel 64 e modo longo
 
 The main reason to move away from [Real mode](http://wiki.osdev.org/Real_Mode) is that there is very limited access to the RAM. As you may remember from the previous part, there are only 2<sup>20</sup> bytes or 1 Megabyte, sometimes even only 640 Kilobytes of RAM available in Real mode.
 
