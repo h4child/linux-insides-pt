@@ -1,76 +1,77 @@
-Kernel booting process. Part 2.
+Processo de inicialização do kernel Part 2.
 ================================================================================
 
-First steps in the kernel setup
+Primeiro passo na inicialização do kernel
 --------------------------------------------------------------------------------
 
-We started to dive into the linux kernel's insides in the previous [part](linux-bootstrap-1.md) and saw the initial part of the kernel setup code. We stopped at the first call to the `main` function (which is the first function written in C) from [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
+Nós começamos mergulhar dentro do kernel linux no [parte anterior](linux-bootstrap-1.md) e vimos a parte inicial da inicialização do código do kernel. Nós paramos na chamada da função `main` (é o primeira função escrita em C) do [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
 
-In this part, we will continue to research the kernel setup code and go over
-* what `protected mode` is,
-* the transition into it,
-* the initialization of the heap and the console,
-* memory detection, CPU validation and keyboard initialization
-* and much much more.
+Nesta parte, nós continuaremos inspecionar o código de inicialização do kernel e revisando
+* O que o `modo protegido` é
+* a transição para ele
+* a inicialização do heap e o console
+* detectação de memória, validação CPU e a inicialização do teclado
+* e muito, muito mais.
 
-So, let's go ahead.
+Então, vamos adiante.
 
-Protected mode
+Modo protegido
 --------------------------------------------------------------------------------
 
-Before we can move to the native Intel64 [Long Mode](http://en.wikipedia.org/wiki/Long_mode), the kernel must switch the CPU into protected mode.
+Antes podemos mover para o [modo longo](http://en.wikipedia.org/wiki/Long_mode) no Intel64 nativo, o kernel deve interromper CPU no modo protegido.
 
-What is [protected mode](https://en.wikipedia.org/wiki/Protected_mode)? Protected mode was first added to the x86 architecture in 1982 and was the main mode of Intel processors from the [80286](http://en.wikipedia.org/wiki/Intel_80286) processor until Intel 64 and long mode came.
+O que é [modo protegido](https://en.wikipedia.org/wiki/Protected_mode)?
+Modo protegido foi o adicionado primeiro na arquitetura x86 em 1982 e foi o principal modo do processador [80286](http://en.wikipedia.org/wiki/Intel_80286) da Intel até Intel 64 e modo longo
 
-The main reason to move away from [Real mode](http://wiki.osdev.org/Real_Mode) is that there is very limited access to the RAM. As you may remember from the previous part, there are only 2<sup>20</sup> bytes or 1 Megabyte, sometimes even only 640 Kilobytes of RAM available in Real mode.
+O principal motivo para afastar do [modo real](http://wiki.osdev.org/Real_Mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real) é que tem aceso muito limitado para RAM. Como você pode lembrar parte anterior, há apenas 2<sup>20</sup> bytes ou 1 mebibytes, algumas vezes até 640 kibibytes de RAM disponível em modo real.
 
-Protected mode brought many changes, but the main one is the difference in memory management. The 20-bit address bus was replaced with a 32-bit address bus. It allowed access to 4 Gigabytes of memory vs the 1 Megabyte in Real mode. Also, [paging](http://en.wikipedia.org/wiki/Paging) support was added, which you can read about in the next sections.
+Modo protegido trouxe muitas mudanças, mas a principal diferença é no gerenciamento de memória. O endereço bus de 20-bit foi substiúída com endereços bus de 32-bit. Permitiu acessar 4 gibibytes de memória vs 1 mebibytes em modo real. Também, suporte a [paginação](http://en.wikipedia.org/wiki/Paging)[(similar pt)](https://pt.wikipedia.org/wiki/Pagina%C3%A7%C3%A3o_de_mem%C3%B3ria) foi dicionado, qual você pode ler sobre na próxima seção.
 
-Memory management in Protected mode is divided into two, almost independent parts:
+Gerenciamento de memória no modo protegido é divido em duas partes quase independentes:
 
-* Segmentation
-* Paging
+* segmentação
+* páginação
 
-Here we will only talk about segmentation. Paging will be discussed in the next sections.
+Aqui nós iremos apenas falar sobre segmentação, Paginação será discutido na pŕoxima seção.
 
-As you can read in the previous part, addresses consist of two parts in Real mode:
+Como você leu anteriormente, endereços consistem de duas partes em modo real:
 
-* Base address of the segment
-* Offset from the segment base
+* Endereço base do segmento
+* Offset do segmento base
 
-And we can get the physical address if we know these two parts by:
+Podemos obter o endereço físico se nós conhecermos essas duas partes por:
 
 ```
-PhysicalAddress = Segment Base * 16 + Offset
+EndereçoFísico = Base * 16 + Offset
 ```
 
-Memory segmentation was completely redone in protected mode. There are no 64 Kilobyte fixed-size segments. Instead, the size and location of each segment is described by an associated data structure called the _Segment Descriptor_. These segment descriptors are stored in a data structure called the `Global Descriptor Table` (GDT).
+Gerenciamento de memória foi completamente refeito em modo protegido. Não há segmento de tamanho fixo de 64 kibibytes. Em vez disso, o tamanho e o local de cada segmento são descrito por uma estrutura de dados associada chamada _Segment Descriptor_. Esses descritores de segmentos são armazenados em uma estrutura de dados chamado de `Global Descriptor Table` (GDT - tabela global de descritores).
 
-The GDT is a structure which resides in memory. It has no fixed place in the memory, so its address is stored in the special `GDTR` register. Later we will see how the GDT is loaded in the Linux kernel code. There will be an operation for loading it from memory, something like:
+O GDT é uma estrutura o qual reside em memória. Não tem lugar fixo na memória, então o endereço é armazenado no registro especial `GDTR`. Mais tarde iremos ver como o GDT é carregado no código no kernel do Linux. Haverá uma operação para carreg-lo da memória, alguma coisa como:
 
 ```assembly
 lgdt gdt
 ```
 
-where the `lgdt` instruction loads the base address and limit(size) of the global descriptor table to the `GDTR` register. `GDTR` is a 48-bit register and consists of two parts:
+Onde a instrução `lgdt` carrega o endereço base e o limite (tamanho) da tabela de descritores globais no registro `GDTR`. `GDTR` é um registro de 48-bit e consiste de duas partes:
 
- * the size(16-bit) of the global descriptor table;
- * the address(32-bit) of the global descriptor table.
+ * o tamanho(16-bit) do global descriptor table;
+ * o endereço(32-bit) do global descriptor table.
 
-As mentioned above, the GDT contains `segment descriptors` which describe memory segments.  Each descriptor is 64-bits in size. The general scheme of a descriptor is:
+Como mencionado acima, o GDT contém o `segmentos de descritores` que decscreve segmentos de memória. Cada descritor tem 64-bits de tamanho. O esquema geral de um descritor é:
 
 ```
- 63         56         51   48    45           39        32 
-------------------------------------------------------------
-|             | |B| |A|       | |   | |0|E|W|A|            |
-| BASE 31:24  |G|/|L|V| LIMIT |P|DPL|S|  TYPE | BASE 23:16 |
-|             | |D| |L| 19:16 | |   | |1|C|R|A|            |
-------------------------------------------------------------
+ 63         56         51    48    45           39        32 
+-------------------------------------------------------------
+|             | |B| |A|        | |   | |0|E|W|A|            |
+| BASE 31:24  |G|/|L|V| LIMITE |P|DPL|S| tipo  | BASE 23:16 |
+|             | |D| |L|  19:16 | |   | |1|C|R|A|            |
+-------------------------------------------------------------
 
  31                         16 15                         0 
 ------------------------------------------------------------
 |                             |                            |
-|        BASE 15:0            |       LIMIT 15:0           |
+|        BASE 15:0            |      LIMITE 15:0           |
 |                             |                            |
 ------------------------------------------------------------
 ```
