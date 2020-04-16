@@ -1,4 +1,4 @@
-Processo de inicialização do kernel Part 2.
+Processo de inicialização do kernel Parte 2.
 ================================================================================
 
 Primeiro passo na inicialização do kernel
@@ -25,14 +25,14 @@ Modo protegido foi o adicionado primeiro na arquitetura x86 em 1982 e foi o prin
 
 O principal motivo para afastar do [modo real](http://wiki.osdev.org/Real_Mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real) é que tem aceso muito limitado para RAM. Como você pode lembrar parte anterior, há apenas 2<sup>20</sup> bytes ou 1 mebibytes, algumas vezes até 640 kibibytes de RAM disponível em modo real.
 
-Modo protegido trouxe muitas mudanças, mas a principal diferença é no gerenciamento de memória. O endereço bus de 20-bit foi substiúída com endereços bus de 32-bit. Permitiu acessar 4 gibibytes de memória vs 1 mebibytes em modo real. Também, suporte a [paginação](http://en.wikipedia.org/wiki/Paging)[(similar pt)](https://pt.wikipedia.org/wiki/Pagina%C3%A7%C3%A3o_de_mem%C3%B3ria) foi dicionado, qual você pode ler sobre na próxima seção.
+Modo protegido trouxe muitas mudanças, mas a principal diferença é no gerenciamento de memória. O endereço bus de 20-bit foi substituído com endereços bus de 32-bit. Permitiu acessar 4 gibibytes de memória vs 1 mebibytes em modo real. Também, suporte a [paginação](http://en.wikipedia.org/wiki/Paging)[(similar pt)](https://pt.wikipedia.org/wiki/Pagina%C3%A7%C3%A3o_de_mem%C3%B3ria) foi adicionado, qual você pode ler sobre na próxima seção.
 
 Gerenciamento de memória no modo protegido é divido em duas partes quase independentes:
 
 * segmentação
-* páginação
+* paginação
 
-Aqui nós iremos apenas falar sobre segmentação, Paginação será discutido na pŕoxima seção.
+Aqui nós iremos apenas falar sobre segmentação, Paginação será discutido na próxima seção.
 
 Como você leu anteriormente, endereços consistem de duas partes em modo real:
 
@@ -47,7 +47,7 @@ EndereçoFísico = Base * 16 + Offset
 
 Gerenciamento de memória foi completamente refeito em modo protegido. Não há segmento de tamanho fixo de 64 kibibytes. Em vez disso, o tamanho e o local de cada segmento são descrito por uma estrutura de dados associada chamada _Segment Descriptor_. Esses descritores de segmentos são armazenados em uma estrutura de dados chamado de `Global Descriptor Table` (GDT - tabela global de descritores).
 
-O GDT é uma estrutura o qual reside em memória. Não tem lugar fixo na memória, então o endereço é armazenado no registro especial `GDTR`. Mais tarde iremos ver como o GDT é carregado no código no kernel do Linux. Haverá uma operação para carreg-lo da memória, alguma coisa como:
+O GDT é uma estrutura o qual reside em memória. Não tem lugar fixo na memória, então o endereço é armazenado no registro especial `GDTR`. Mais tarde iremos ver como o GDT é carregado no código no Kernel do Linux. Haverá uma operação para carrega-lo da memória, alguma coisa como:
 
 ```assembly
 lgdt gdt
@@ -55,10 +55,10 @@ lgdt gdt
 
 Onde a instrução `lgdt` carrega o endereço base e o limite (tamanho) da tabela de descritores globais no registro `GDTR`. `GDTR` é um registro de 48-bit e consiste de duas partes:
 
- * o tamanho(16-bit) do global descriptor table;
- * o endereço(32-bit) do global descriptor table.
+ * o tamanho(16-bit) do GDT;
+ * o endereço(32-bit) do GDT.
 
-Como mencionado acima, o GDT contém o `segmentos de descritores` que decscreve segmentos de memória. Cada descritor tem 64-bits de tamanho. O esquema geral de um descritor é:
+Como mencionado acima, o GDT contém o `segmentos de descritores` que descreve segmentos de memória. Cada descritor tem 64-bits de tamanho. O esquema geral de um descritor é:
 
 ```
  63         56         51    48    45           39        32 
@@ -75,89 +75,90 @@ Como mencionado acima, o GDT contém o `segmentos de descritores` que decscreve 
 |                             |                            |
 ------------------------------------------------------------
 ```
+Não preocupe, eu sei que parece sombrio depois do modo real, mas é fácil. Por exemplo LIMITE 15:0 significa que bits 0-15 do limite do segmento são localizado no começo de descritor. O resto está no LIMITE 19:16, qual é localizado nos bits 48-51 de descritor. Então, o tamanho do limite é 0-19 intos é, 20-bits. Vamos ver mais de perto isso:
 
-Don't worry, I know it looks a little scary after Real mode, but it's easy. For example LIMIT 15:0 means that bits 0-15 of the segment limit are located at the beginning of the Descriptor. The rest of it is in LIMIT 19:16, which is located at bits 48-51 of the Descriptor. So, the size of Limit is 0-19 i.e 20-bits. Let's take a closer look at it:
+1. Limite[20-bits] é dividido entre bits 0-15 e 48-51. Define o `length_of_segment - 1`. Depende no `G` (Granularity) bit.
 
-1. Limit[20-bits] is split between bits 0-15 and 48-51. It defines the `length_of_segment - 1`. It depends on the `G`(Granularity) bit.
+  * Se `G` (bit 55) é 0 e o limite do segmento é 0, o tamanho do segmento é 1 Byte
+  * Se `G` é 1 e o limite de segmento é 0, o tamanho do segmento é 4096 Bytes
+  * Se `G` é 0 e o limite do segmento é 0xfffff, o tamanho do segmento é 1 Mebibyte
+  * Se `G` é 1 e o limite do segmento é 0xfffff, o tamanho do segmento é 4 Gibibytes
 
-  * if `G` (bit 55) is 0 and the segment limit is 0, the size of the segment is 1 Byte
-  * if `G` is 1 and the segment limit is 0, the size of the segment is 4096 Bytes
-  * if `G` is 0 and the segment limit is 0xfffff, the size of the segment is 1 Megabyte
-  * if `G` is 1 and the segment limit is 0xfffff, the size of the segment is 4 Gigabytes
+  Então, o que isso significa
+  * Se G é 0, Limite é interpretado em termos de 1 Byte e o tamanho máximo do segmento pode ser 1 Mebibyte.
+  * Se G é 1, Limite é interpretado em termos de 4096 Bytes = 4KBytes = 1 página e o tamanho máximo do segmento pode ser 4 Gibibytes. Na verdade, quando G é 1, o valor do Limite é deslocado para a esquerda por 12 bits. Então, 20 bits + 12 bits = 32 bits e 2<sup>32</sup> = 4 Gibibytes.
 
-  So, what this means is
-  * if G is 0, Limit is interpreted in terms of 1 Byte and the maximum size of the segment can be 1 Megabyte.
-  * if G is 1, Limit is interpreted in terms of 4096 Bytes = 4 KBytes = 1 Page and the maximum size of the segment can be 4 Gigabytes. Actually, when G is 1, the value of Limit is shifted to the left by 12 bits. So, 20 bits + 12 bits = 32 bits and 2<sup>32</sup> = 4 Gigabytes.
+2. Base[32-bits] é dividido entre bits 16-31, 32-39 e 56-63. Define o endereço físico da localização inicial do segmento.
 
-2. Base[32-bits] is split between bits 16-31, 32-39 and 56-63. It defines the physical address of the segment's starting location.
+3. Tipo/atributo[5-bits] é representado por bits 40-44. Define o tipo do segmento e como pode ser acessado.
+  * flag `S` no bit 44 especifica o tipo do descritor. Se `S` é 0 então esse segmento é um segmento de sistema, enquanto se `S` é 1 então esse é um código ou segmento de dados (segmento de pilha são segmentos de dados qual devem ser segmentos lido/escrever).
 
-3. Type/Attribute[5-bits] is represented by bits 40-44. It defines the type of segment and how it can be accessed.
-  * The `S` flag at bit 44 specifies the descriptor type. If `S` is 0 then this segment is a system segment, whereas if `S` is 1 then this is a code or data segment (Stack segments are data segments which must be read/write segments).
+Determinar se o segmento é um código ou segmento de dados, nós podemos checar seu atributo EX(bit 43) (marcado como 0 no diagrama acima). Se é 0, então o segmento, de outra forma, é um segmento de código.
 
-To determine if the segment is a code or data segment, we can check its Ex(bit 43) Attribute (marked as 0 in the above diagram). If it is 0, then the segment is a Data segment, otherwise, it is a code segment.
-
-A segment can be of one of the following types:
+Um segmento pode ser de um dos seguintes tipos:
 
 ```
 --------------------------------------------------------------------------------------
-|           Type Field        | Descriptor Type | Description                        |
-|-----------------------------|-----------------|------------------------------------|
-| Decimal                     |                 |                                    |
-|             0    E    W   A |                 |                                    |
-| 0           0    0    0   0 | Data            | Read-Only                          |
-| 1           0    0    0   1 | Data            | Read-Only, accessed                |
-| 2           0    0    1   0 | Data            | Read/Write                         |
-| 3           0    0    1   1 | Data            | Read/Write, accessed               |
-| 4           0    1    0   0 | Data            | Read-Only, expand-down             |
-| 5           0    1    0   1 | Data            | Read-Only, expand-down, accessed   |
-| 6           0    1    1   0 | Data            | Read/Write, expand-down            |
-| 7           0    1    1   1 | Data            | Read/Write, expand-down, accessed  |
-|                  C    R   A |                 |                                    |
-| 8           1    0    0   0 | Code            | Execute-Only                       |
-| 9           1    0    0   1 | Code            | Execute-Only, accessed             |
-| 10          1    0    1   0 | Code            | Execute/Read                       |
-| 11          1    0    1   1 | Code            | Execute/Read, accessed             |
-| 12          1    1    0   0 | Code            | Execute-Only, conforming           |
-| 14          1    1    0   1 | Code            | Execute-Only, conforming, accessed |
-| 13          1    1    1   0 | Code            | Execute/Read, conforming           |
-| 15          1    1    1   1 | Code            | Execute/Read, conforming, accessed |
+|         Campo Tipo          |   Tipo de   |            Descrição                   |
+|                             |  Descritor  |                                        |
+|-----------------------------|-------------|----------------------------------------|
+| Decimal                     |             |                                        |
+|             0    E    W   A |             |                                        |
+| 0           0    0    0   0 | Dados       | ler-apenas                             |
+| 1           0    0    0   1 | Dados       | ler-apenas, acessado                   |
+| 2           0    0    1   0 | Dados       | ler/escrever                           |
+| 3           0    0    1   1 | Dados       | ler/escrever, acessado                 |
+| 4           0    1    0   0 | Dados       | ler-apenas, expandir-baixo             |
+| 5           0    1    0   1 | Dados       | ler-apenas, expandir-baixo, acessado   |
+| 6           0    1    1   0 | Dados       | ler/escrever, expandir-baixo           |
+| 7           0    1    1   1 | Dados       | ler/escrever, expandir-baixo, acessado |
+|                  C    R   A |             |                                        |
+| 8           1    0    0   0 | Código      | executar-apenas                        |
+| 9           1    0    0   1 | Código      | executar-apenas, acessado              |
+| 10          1    0    1   0 | Código      | executar/ler                           |
+| 11          1    0    1   1 | Código      | executar/ler, acessado                 |
+| 12          1    1    0   0 | Código      | executar-apenas, conforme              |
+| 14          1    1    0   1 | Código      | executar-apenas, conforme, acessado    |
+| 13          1    1    1   0 | Código      | executar/ler, conforme                 |
+| 15          1    1    1   1 | Código      | executar/ler, conforme, acessado       |
 --------------------------------------------------------------------------------------
 ```
 
-As we can see the first bit(bit 43) is `0` for a _data_ segment and `1` for a _code_ segment. The next three bits (40, 41, 42) are either `EWA`(*E*xpansion *W*ritable *A*ccessible) or CRA(*C*onforming *R*eadable *A*ccessible).
-  * if E(bit 42) is 0, expand up, otherwise, expand down. Read more [here](http://www.sudleyplace.com/dpmione/expanddown.html).
-  * if W(bit 41)(for Data Segments) is 1, write access is allowed, and if it is 0, the segment is read-only. Note that read access is always allowed on data segments.
-  * A(bit 40) controls whether the segment can be accessed by the processor or not.
-  * C(bit 43) is the conforming bit(for code selectors). If C is 1, the segment code can be executed from a lower level privilege (e.g. user) level. If C is 0, it can only be executed from the same privilege level.
-  * R(bit 41) controls read access to code segments; when it is 1, the segment can be read from. Write access is never granted for code segments.
+Como nós vemos o primeiro bit(bit 43) é `0` para um segmento de _data_ (dados) e `1` para um segmento de _code_ (código). O próximos 3 bits (40, 41, 42) são `EWA` (*E*xpansion[expansão] *W*ritable[gravável] *A*ccessible[acessível]) ou CRA(*C*onforming[conforme] *R*eadable[legível] *A*ccessible[acessível]).
 
-4. DPL[2-bits] (Descriptor Privilege Level) comprises the bits 45-46. It defines the privilege level of the segment. It can be 0-3 where 0 is the most privileged level.
+  * Se E(bit 42) é 0, expande para cima, de outra forma, expande para baixo. Leia mais [aqui](http://www.sudleyplace.com/dpmione/expanddown.html).
+  * Se W(bit 41)(para segmentos de dados) é 1, acesso escrita é permitido no segmento de dados e se é 0, o segmento é apenas leitura. Note que o acesso a leitura é sempre permitido nos segmentos da dados.
+  * A(bit 40) controla se o segmento pode ser acessado pelo processador ou não.
+  * C(bit 43) é o bit conforme(para seletor de códigos). Se C é 1, o segmento de código pode ser executado do nível de privilégio baixo (exemplo usuário). Se C é 0, pode apenas ser executado do mesmo nível de privilégio.
+  * R(bit 41) controla o acesso a leitura para segmento de código; quando é 1, o segmento pode ser lido. O acesso a escrita nunca é concedida pelo segmento de código.
 
-5. The P flag(bit 47) indicates if the segment is present in memory or not. If P is 0, the segment will be presented as _invalid_ and the processor will refuse to read from this segment.
+4. DPL[2-bits] (Nível de privilégio do descritor) consta o bits 45-46. Define o nível de privilégio do segmento. Pode ser 0-3 onde 0 é o nível de privilégio maior.
 
-6. AVL flag(bit 52) - Available and reserved bits. It is ignored in Linux.
+5. A flag P(bit 47) indica se o segmento está presente  na memória ou não. Se P é 0, o segmento vai ser declarada como _invalid_ (inválido) e o processador recusa ler o segmento.
 
-7. The L flag(bit 53) indicates whether a code segment contains native 64-bit code. If it is set, then the code segment executes in 64-bit mode.
+6. A flag AVL(bit 52) - bits disponível e reservado. É ignorado em linux.
 
-8. The D/B flag(bit 54)  (Default/Big flag) represents the operand size i.e 16/32 bits. If set, operand size is 32 bits. Otherwise, it is 16 bits.
+7. A flag L(bit 53) indica se o segmento de código contém código 64-bit nativo. Se está definido, então o segmento de código executa em modo 64-bit.
 
-Segment registers contain segment selectors as in real mode. However, in protected mode, a segment selector is handled differently. Each Segment Descriptor has an associated Segment Selector which is a 16-bit structure:
+8. A flag D/B(bit 54) (default/Big flag) representa o tamanho do operando, ou seja 16/32 bits. Se definido, tamanho do operando é 32 bits. Senão é 16 bits.
+
+Registro de segmentos contém seletores de segmentos como em modo real. Contudo, em modo protegido, um seletor de segmento está lidando diferentemente. Cada descritor de segmento tem um seletor de segmento associado que é uma estrutura de 16-bits:
 
 ```
- 15             3 2  1     0
------------------------------
-|      Index     | TI | RPL |
------------------------------
+ 15                3 2  1     0
+-------------------------------
+|  índice (index)  | TI | RPL |
+-------------------------------
 ```
 
-Where,
-* **Index** stores the index number of the descriptor in the GDT.
-* **TI**(Table Indicator) indicates where to search for the descriptor. If it is 0 then the descriptor is searched for in the Global Descriptor Table(GDT). Otherwise, it will be searched for in the Local Descriptor Table(LDT).
-* And **RPL** contains the Requester's Privilege Level.
+Onde,
+* **índice** armazena o número do índice de descritor no GDT.
+* **TI**(indicador de tabela [table indicator]) indica onde procurar para o descritor. Se for 0, então o descritor será pesquisado na tabela global de descritores (GDT).
+* **RPL** contém o nível de privilégio do requisitante.
 
-Every segment register has a visible and a hidden part.
-* Visible - The Segment Selector is stored here.
-* Hidden -  The Segment Descriptor (which contains the base, limit, attributes & flags) is stored here.
+Todo registro de segmento tem uma parte visível e uma parte oculto.
+* Visível - o seletor de segmento é armazenado aqui.
+* oculto  - O descritor de segmento (o qual contém a base, limite, atributos e flags) é armazenado aqui.
 
 The following steps are needed to get a physical address in protected mode:
 
