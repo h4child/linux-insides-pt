@@ -45,7 +45,7 @@ Podemos obter o endereço físico se nós conhecermos essas duas partes por:
 EndereçoFísico = Base * 16 + Offset
 ```
 
-Gerenciamento de memória foi completamente refeito em modo protegido. Não há segmento de tamanho fixo de 64 kibibytes. Em vez disso, o tamanho e o local de cada segmento são descrito por uma estrutura de dados associada chamada _Segment Descriptor_. Esses descritores de segmentos são armazenados em uma estrutura de dados chamado de `Global Descriptor Table` (GDT - tabela global de descritores).
+Gerenciamento de memória foi completamente refeito em modo protegido. Não há segmento de tamanho fixo de 64 kibibytes. Em vez disso, o tamanho e o local de cada segmento são descrito por uma estrutura de dados associada chamada _Descritor de Segmento_. Esses descritores de segmentos são armazenados em uma estrutura de dados chamado de `Global Descriptor Table` (GDT - tabela global de descritores).
 
 O GDT é uma estrutura o qual reside em memória. Não tem lugar fixo na memória, então o endereço é armazenado no registro especial `GDTR`. Mais tarde iremos ver como o GDT é carregado no código no Kernel do Linux. Haverá uma operação para carrega-lo da memória, alguma coisa como:
 
@@ -58,7 +58,7 @@ Onde a instrução `lgdt` carrega o endereço base e o limite (tamanho) da tabel
  * o tamanho(16-bit) do GDT;
  * o endereço(32-bit) do GDT.
 
-Como mencionado acima, o GDT contém o `segmentos de descritores` que descreve segmentos de memória. Cada descritor tem 64-bits de tamanho. O esquema geral de um descritor é:
+Como mencionado acima, o GDT contém o `descritores de segmentos` que descreve segmentos de memória. Cada descritor tem 64-bits de tamanho. O esquema geral de um descritor é:
 
 ```
  63         56         51    48    45           39        32 
@@ -91,7 +91,7 @@ Não preocupe, eu sei que parece sombrio depois do modo real, mas é fácil. Por
 2. Base[32-bits] é dividido entre bits 16-31, 32-39 e 56-63. Define o endereço físico da localização inicial do segmento.
 
 3. Tipo/atributo[5-bits] é representado por bits 40-44. Define o tipo do segmento e como pode ser acessado.
-  * flag `S` no bit 44 especifica o tipo do descritor. Se `S` é 0 então esse segmento é um segmento de sistema, enquanto se `S` é 1 então esse é um código ou segmento de dados (segmento de pilha são segmentos de dados qual devem ser segmentos lido/escrever).
+  * flag(bandeira) `S` no bit 44 especifica o tipo do descritor. Se `S` é 0 então esse segmento é um segmento de sistema, enquanto se `S` é 1 então esse é um código ou segmento de dados (segmento de pilha são segmentos de dados qual devem ser segmentos lido/escrever).
 
 Determinar se o segmento é um código ou segmento de dados, nós podemos checar seu atributo EX(bit 43) (marcado como 0 no diagrama acima). Se é 0, então o segmento, de outra forma, é um segmento de código.
 
@@ -134,13 +134,13 @@ Como nós vemos o primeiro bit(bit 43) é `0` para um segmento de _data_ (dados)
 
 4. DPL[2-bits] (Nível de privilégio do descritor) consta o bits 45-46. Define o nível de privilégio do segmento. Pode ser 0-3 onde 0 é o nível de privilégio maior.
 
-5. A flag P(bit 47) indica se o segmento está presente  na memória ou não. Se P é 0, o segmento vai ser declarada como _invalid_ (inválido) e o processador recusa ler o segmento.
+5. A flag(bandeira) P(bit 47) indica se o segmento está presente  na memória ou não. Se P é 0, o segmento vai ser declarada como _invalid_ (inválido) e o processador recusa ler o segmento.
 
-6. A flag AVL(bit 52) - bits disponível e reservado. É ignorado em linux.
+6. A flag(bandeira) AVL(bit 52) - bits disponível e reservado. É ignorado em linux.
 
-7. A flag L(bit 53) indica se o segmento de código contém código 64-bit nativo. Se está definido, então o segmento de código executa em modo 64-bit.
+7. A flag(bandeira) L(bit 53) indica se o segmento de código contém código 64-bit nativo. Se está definido, então o segmento de código executa em modo 64-bit.
 
-8. A flag D/B(bit 54) (default/Big flag) representa o tamanho do operando, ou seja 16/32 bits. Se definido, tamanho do operando é 32 bits. Senão é 16 bits.
+8. A flag(bandeira) D/B(bit 54) (default/Big flag) representa o tamanho do operando, ou seja 16/32 bits. Se definido, tamanho do operando é 32 bits. Senão é 16 bits.
 
 Registro de segmentos contém seletores de segmentos como em modo real. Contudo, em modo protegido, um seletor de segmento está lidando diferentemente. Cada descritor de segmento tem um seletor de segmento associado que é uma estrutura de 16-bits:
 
@@ -160,39 +160,41 @@ Todo registro de segmento tem uma parte visível e uma parte oculto.
 * Visível - o seletor de segmento é armazenado aqui.
 * oculto  - O descritor de segmento (o qual contém a base, limite, atributos e flags) é armazenado aqui.
 
-The following steps are needed to get a physical address in protected mode:
+O passos seguintes são necessário obter um endereço físico em modo protegido:
 
-* The segment selector must be loaded in one of the segment registers.
-* The CPU tries to find a segment descriptor at the offset `GDT address + Index` from the selector and then loads the descriptor into the *hidden* part of the segment register.
-* If paging is disabled, the linear address of the segment, or its physical address, is given by the formula: Base address (found in the descriptor obtained in the previous step) + Offset.
+* O seletor de segmento deve ser carregado em um dos registros de segmentos.
+* A CPU tenta encontrar um descritor de segmento no deslocamento `Endereço GDT + Índice` do seletor e então carrega o descritor na parte *oculta* do registro de segmento.
+* Se a paginação é desativada, o endereço linear do segmento ou endereço físico, é dado pela fórmula:
 
-Schematically it will look like this:
+ Endereço básico (encontra no descritor obtido nos passos anteriores) + Offset.
 
-![linear address](images/linear_address.png)
+Esquema será assim:
 
-The algorithm for the transition from real mode into protected mode is:
+![Endereço Linear](images/linear_address.png)
 
-* Disable interrupts
-* Describe and load the GDT with the `lgdt` instruction
-* Set the PE (Protection Enable) bit in CR0 (Control Register 0)
-* Jump to protected mode code
+O algoritmo para a transição do modo real para modo protegido é:
 
-We will see the complete transition to protected mode in the linux kernel in the next part, but before we can move to protected mode, we need to do some more preparations.
+* Desativar interruptores
+* descreve e carrega o GDT com a intrução `lgdt`
+* Defini o bit PE (ativar proteção - Protection Enable) em CR0 (Controle registro 0 - Control Register 0)
+* Pula para o código do modo protegido
 
-Let's look at [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). We can see some routines there which perform keyboard initialization, heap initialization, etc... Let's take a look.
+Nós iremos ver a transição completa para o modoprotegido no Kernel do Linux na próxima parte, mas antes nós mover para o modo protegido, nós iremos fazer algumas outras preparações.
 
-Copying boot parameters into the "zeropage"
+Deixe-nos olhar no [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). Nós vemos algumas rotinas o qual realiza inicialização de teclados, inicialização heap, etc... Vamos dar uma olhada.
+
+Copiando parâmetros boot para o "zeropage"
 --------------------------------------------------------------------------------
 
-We will start from the `main` routine in "main.c". The first function which is called in `main` is [`copy_boot_params(void)`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). It copies the kernel setup header into the corresponding field of the `boot_params` structure which is defined in the [arch/x86/include/uapi/asm/bootparam.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/include/uapi/asm/bootparam.h) header file.
+Nós começaremos da rotina `main` em "main.c". A primeira função que é chamada em `main` é [`copy_boot_params(void)`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). Copia o cabeçalho do kernel no campos correspondente da estrutura `boot_params` que é definido no arquivo de cabeçalho [arch/x86/include/uapi/asm/bootparam.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/include/uapi/asm/bootparam.h).
 
-The `boot_params` structure contains the `struct setup_header hdr` field. This structure contains the same fields as defined in the [linux boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt) and is filled by the boot loader and also at kernel compile/build time. `copy_boot_params` does two things:
+A estrutura `boot_params` contém o campo `struct setup_header hdr`. Essa estrutura contém o mesmo campo definido no [linux boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt) e é preenchido por um boot loader e também no tempo de compilação do kernel. `copy_boot_params` faz duas coisas:
 
-1. It copies `hdr` from [header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L280) to the `setup_header` field in `boot_params` structure.
+1. Copia `hdr` do [header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L280) para o campo `setup_header` na estrutura `boot_params`.
 
-2. It updates the pointer to the kernel command line if the kernel was loaded with the old command line protocol.
+2. Atualiza o ponteiro para o linha de comando do kernel, se o kernel foi carregado com o antigo protocolo de linha de comando.
 
-Note that it copies `hdr` with the `memcpy` function, defined in the [copy.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/copy.S) source file. Let's have a look inside:
+Note que copia `hdr` com o função `memcpy`, definido no arquivo [copy.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/copy.S). Vamos dar uma olhada dentro:
 
 ```assembly
 GLOBAL(memcpy)
@@ -211,26 +213,26 @@ GLOBAL(memcpy)
     retl
 ENDPROC(memcpy)
 ```
+Yeah, nós movemos para código C e agora assembly de novo :) primeiro de tudo, nós podemos ver que `memcpy` e outras rotinas que são definido aqui, começa e termina com 2 macros: `GLOBAL` e `ENDPROC`. `GLOBAL` é descrito em [arch/x86/include/asm/linkage.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/include/asm/linkage.h) que define a diretiva `globl` e label. `ENDPROC` é descrito em [include/linux/linkage.h](https://github.com/torvalds/linux/blob/v4.16/include/linux/linkage.h) e marca o símbolo `name` como um nome de uma função e termina com o tamanho do simbolo `name`.
 
-Yeah, we just moved to C code and now assembly again :) First of all, we can see that `memcpy` and other routines which are defined here, start and end with the two macros: `GLOBAL` and `ENDPROC`. `GLOBAL` is described in [arch/x86/include/asm/linkage.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/include/asm/linkage.h) which defines the `globl` directive and its label. `ENDPROC` is described in [include/linux/linkage.h](https://github.com/torvalds/linux/blob/v4.16/include/linux/linkage.h) and marks the `name` symbol as a function name and ends with the size of the `name` symbol.
-
-The implementation of `memcpy` is simple. At first, it pushes values from the `si` and `di` registers to the stack to preserve their values because they will change during the `memcpy`. As we can see in the `REALMODE_CFLAGS` in `arch/x86/Makefile`, the kernel build system uses the `-mregparm=3` option of GCC, so functions get the first three parameters from `ax`, `dx` and `cx` registers.  Calling `memcpy` looks like this:
+A implementação do `memcpy` é simples. Em primeiro, envia valores do registros `si` e `di` para a stack preservar seus valores por que eles vão mudar durante o `memcpy`. Como nós podemos ver no `REALMODE_CFLAGS` no `arch/x86/Makefile`, o sistema de compilação do kernel usa a opção `-mregparm=3` do GCC, então a função obtém os três primeiro parâmetro dos registros `ax`, `dx` e `cx`. Chamar  `memcpy`  parece com isso:
 
 ```c
 memcpy(&boot_params.hdr, &hdr, sizeof hdr);
 ```
+Então,
+* `ax` contém o endereço do `boot_params.hdr`
+* `dx` contém o endereço do `hdr`
+* `cx` contém o tamanho do `hdr` em bytes.
 
-So,
-* `ax` will contain the address of `boot_params.hdr`
-* `dx` will contain the address of `hdr`
-* `cx` will contain the size of `hdr` in bytes.
+`memcpy` coloca o endereço do `boot_params.hdr` no `di` e salva `cx` na stack. Depois disso, ele altera o valor para a direita 2 vezes (ou o divide por 4) e copia quatro bytes do endereço em `si` para o endereço em `di`. Depois disso, nós restauramos o tamanho do `hdr` de novo, alinha por 4 bytes e copia o resto dos bytes do endereço no `si` para o endereço no `di` bytes por byte (se houver mais). Agora o valor do `si` e `di` são restaurado  da stack e a operação de cópia concluída.
 
-`memcpy` puts the address of `boot_params.hdr` into `di` and saves `cx` on the stack. After this it shifts the value right 2 times (or divides it by 4) and copies four bytes from the address at `si` to the address at `di`. After this, we restore the size of `hdr` again, align it by 4 bytes and copy the rest of the bytes from the address at `si` to the address at `di` byte by byte (if there is more). Now the values of `si` and `di` are restored from the stack and the copying operation is finished.
-
-Console initialization
+Inicialização do Console
 --------------------------------------------------------------------------------
 
-After `hdr` is copied into `boot_params.hdr`, the next step is to initialize the console by calling the `console_init` function,  defined in [arch/x86/boot/early_serial_console.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/early_serial_console.c).
+Depois `hdr` é copiado no `boot_params.hdr`, o próximo passo é para inicializar o console chamando a função `console_init`, definido em [arch/x86/boot/early_serial_console.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/early_serial_console.c).
+
+Tenta
 
 It tries to find the `earlyprintk` option in the command line and if the search was successful, it parses the port address and baud rate of the serial port and initializes the serial port. The value of the `earlyprintk` command line option can be one of these:
 
