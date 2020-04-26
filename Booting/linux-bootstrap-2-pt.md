@@ -231,23 +231,21 @@ Inicialização do Console
 --------------------------------------------------------------------------------
 
 Depois `hdr` é copiado no `boot_params.hdr`, o próximo passo é para inicializar o console chamando a função `console_init`, definido em [arch/x86/boot/early_serial_console.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/early_serial_console.c).
-
-Tenta
-
-It tries to find the `earlyprintk` option in the command line and if the search was successful, it parses the port address and baud rate of the serial port and initializes the serial port. The value of the `earlyprintk` command line option can be one of these:
+ 
+Tenta encontrar a opção `earlyprintk` na linha de comando e se a busca foi bem-sucedida, analise o endereço da porta e a taxa de transmissão da porta serial e inicializa a porta serial. O valor da opção da linha de comando `earlyprintk` pode ser um desses:
 
 * serial,0x3f8,115200
 * serial,ttyS0,115200
 * ttyS0,115200
 
-After serial port initialization we can see the first output:
+Depois inicializa a porta serial, nós podemos ver o primeira saída:
 
 ```C
 if (cmdline_find_option_bool("debug"))
     puts("early console in setup code\n");
 ```
 
-The definition of `puts` is in [tty.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/tty.c). As we can see it prints character by character in a loop by calling the `putchar` function. Let's look into the `putchar` implementation:
+A definição de `puts` é em [tty.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/tty.c). Como nós vermos imprimir caracteres por caracteres em um loop chamando a função `putchar`. Deixe-nos ver a implementação do  `putchar`.
 
 ```C
 void __attribute__((section(".inittext"))) putchar(int ch)
@@ -261,10 +259,9 @@ void __attribute__((section(".inittext"))) putchar(int ch)
         serial_putchar(ch);
 }
 ```
+`__attribute__((section(".inittext")))` significa que esse código será na seção `.inittext`. Nós podemos encontrar no arquivo linker [setup.ld](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld).
 
-`__attribute__((section(".inittext")))` means that this code will be in the `.inittext` section. We can find it in the linker file [setup.ld](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld).
-
-First of all, `putchar` checks for the `\n` symbol and if it is found, prints `\r` before. After that it prints the character on the VGA screen by calling the BIOS with the `0x10` interrupt call:
+Primeiro de tudo, checa `putchar` para o símbolo `\n` e se é encontrado, imprimi `\r` depois. Depois que imprimi os caracteres na tela VGA chamando a BIOS com a chamada interrupt `0x10`:
 
 ```C
 static void __attribute__((section(".inittext"))) bios_putchar(int ch)
@@ -279,8 +276,7 @@ static void __attribute__((section(".inittext"))) bios_putchar(int ch)
     intcall(0x10, &ireg, NULL);
 }
 ```
-
-Here `initregs` takes the `biosregs` structure and first fills `biosregs` with zeros using the `memset` function and then fills it with register values.
+Aqui o `initregs` pega a estrutura `biosregs` e preenche o primeiro `biosregs` com zeros usando a função `memset` e então preenche com valores de registros.
 
 ```C
     memset(reg, 0, sizeof *reg);
@@ -290,8 +286,7 @@ Here `initregs` takes the `biosregs` structure and first fills `biosregs` with z
     reg->fs = fs();
     reg->gs = gs();
 ```
-
-Let's look at the implementation of [memset](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/copy.S#L36):
+Vamos observar a implementação do [memset](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/copy.S#L36):
 
 ```assembly
 GLOBAL(memset)
@@ -309,23 +304,22 @@ GLOBAL(memset)
     retl
 ENDPROC(memset)
 ```
+Como você pode ler acima, usa a mesma convenção de chamada como a função `memcpy`, que significa que a função tem parâmetro dos registros `ax`, `dx` e `cx`.
 
-As you can read above, it uses the same calling conventions as the `memcpy` function, which means that the function gets its parameters from the `ax`, `dx` and `cx` registers.
+A implementação do `memset` é semelhante à do memcpy. Salva o valor do registro `di` na stack e coloca o valor do `ax`, que armazena o endereço da estrutura `biosregs` em  `di`. Próximo é a instrução `movzbl`, que copia o valor do `dl` para o byte mais baixo do registro `eax`. Os 3 bytes altos restantes de `eax` serão preenchidos com zeros.
 
-The implementation of `memset` is similar to that of memcpy. It saves the value of the `di` register on the stack and puts the value of`ax`, which stores the address of the `biosregs` structure, into `di` . Next is the `movzbl` instruction, which copies the value of `dl` to the lowermost byte of the `eax` register. The remaining 3 high bytes of `eax` will be filled with zeros.
+A próxima instrução multiplica `eax` com `0x01010101`. Precisa por que  `memset` vai copiar 4 bytes no mesmo tempo. Por exemplo, se nós necessitar preencher uma estrutura cujo tamanho seja 4 bytes com o valor `0x7` com memset, `eax` vao conter o `0x00000007`. Então se nós multiplicarmos `eax` com `0x01010101`, nós iremos obter `0x07070707` e agora nós podemos copiar esses 4 bytes na estrutura. `memset` usa a instrução `rep; stosl` para copiar `eax` em `es:di`.
 
-The next instruction multiplies `eax` with `0x01010101`. It needs to because `memset` will copy 4 bytes at the same time. For example, if we need to fill a structure whose size is 4 bytes with the value `0x7` with memset, `eax` will contain the `0x00000007`. So if we multiply `eax` with `0x01010101`, we will get `0x07070707` and now we can copy these 4 bytes into the structure. `memset` uses the `rep; stosl` instruction to copy `eax` into `es:di`.
+O resto da função `memset` quase a mesma coisa que `memcpy`.
 
-The rest of the `memset` function does almost the same thing as `memcpy`.
+Depois a estrutura `biosregs` é preenchido com `memset`, `bios_putchar` chama o interrupt [0x10](http://www.ctyme.com/intr/rb-0106.htm) que imprimi um caracteres. Mais tarde checa se a porta serial foi inicializada ou não e grava um caracteres com [serial_putchar](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/tty.c) e a instrução `inb/outb` se foi definida.
 
-After the `biosregs` structure is filled with `memset`, `bios_putchar` calls the [0x10](http://www.ctyme.com/intr/rb-0106.htm) interrupt which prints a character. Afterwards it checks if the serial port was initialized or not and writes a character there with [serial_putchar](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/tty.c) and `inb/outb` instructions if it was set.
-
-Heap initialization
+Inicialização do Heap
 --------------------------------------------------------------------------------
 
-After the stack and bss section have been prepared in [header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) (see previous [part](linux-bootstrap-1.md)), the kernel needs to initialize the [heap](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c) with the [`init_heap`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c) function.
+Após a seção stack e bss ter preparado em [header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S) (veja [parte anterior](linux-bootstrap-1.md)), o kernel precisa inicializar o [heap](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c) com a função [`init_heap`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
 
-First of all `init_heap` checks the [`CAN_USE_HEAP`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/include/uapi/asm/bootparam.h#L24) flag from the [`loadflags`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L320) structure in the kernel setup header and calculates the end of the stack if this flag was set:
+Primeiro de tudo `init_heap` checa a flag [`CAN_USE_HEAP`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/include/uapi/asm/bootparam.h#L24) da estrutura [`loadflags`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L320) no cabeçalho de inicialização do kernel e calcula o final da stack se essa flag foi definida:
 
 ```C
     char *stack_end;
@@ -335,24 +329,24 @@ First of all `init_heap` checks the [`CAN_USE_HEAP`](https://github.com/torvalds
             : "=r" (stack_end) : "i" (-STACK_SIZE));
 ```
 
-or in other words `stack_end = esp - STACK_SIZE`.
+ou em outras palavras `stack_end = esp - STACK_SIZE`.
 
-Then there is the `heap_end` calculation:
+Então tem o cálculo `heap_end`:
 
 ```C
      heap_end = (char *)((size_t)boot_params.hdr.heap_end_ptr + 0x200);
 ```
 
-which means `heap_end_ptr` or `_end` + `512` (`0x200h`). The last check is whether `heap_end` is greater than `stack_end`. If it is then `stack_end` is assigned to `heap_end` to make them equal.
+que significa `heap_end_ptr` ou `_end`  + `512` (`0x200h`). A última verificação é se `heap_end` é maior que  `stack_end`. Se estiver, então `stack_end` é atribuído para `heap_end` para faze-los iguais.
 
-Now the heap is initialized and we can use it using the `GET_HEAP` method. We will see what it is used for, how to use it and how it is implemented in the next posts.
+Agora o heap está inicializado e podemos usar o método `GET_HEAP`. Veremos para que é usado, como usá-lo e como é implementado nos próximos posts.
 
-CPU validation
+Validação da CPU
 --------------------------------------------------------------------------------
 
-The next step as we can see is cpu validation through the `validate_cpu` function from [arch/x86/boot/cpu.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/cpu.c) source code file.
+O próximo passo, como podemos ver, é a validação da CPU através da função `validate_cpu` do arquivo [arch/x86/boot/cpu.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/cpu.c).
 
-It calls the [`check_cpu`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/cpucheck.c) function and passes cpu level and required cpu level to it and checks that the kernel launches on the right cpu level.
+Chama a função [`check_cpu`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/cpucheck.c) e passa o nível da CPU e requer o nível da CPU e verifica se o kernel é iniciado no nível correto da CPU.
 
 ```C
 check_cpu(&cpu_level, &req_level, &err_flags);
@@ -362,9 +356,9 @@ if (cpu_level < req_level) {
 }
 ```
 
-The `check_cpu` function checks the CPU's flags, the presence of [long mode](http://en.wikipedia.org/wiki/Long_mode) in the case of x86_64(64-bit) CPU, checks the processor's vendor and makes preparations for certain vendors like turning off SSE+SSE2 for AMD if they are missing, etc.
+A função `check_cpu` checa a flag da CPU, a presença do [long mode (modo longo)](http://en.wikipedia.org/wiki/Long_mode) no caso da CPU x86_64 (64 bits), verifica o fornecedor do processador e faz os preparativos para determinados fornecedores, como desativar o SSE + SSE2 para AMD se estiverem ausentes, etc.
 
-at the next step, we may see a call to the `set_bios_mode` function after setup code found that a CPU is suitable. As we may see, this function is implemented only for the `x86_64` mode:
+No próximo passo chamamos a função `set_bios_mode` depois que o código de inicialização descobriu que a CPU é adequada. A função está implementada apenas para o modo `x86_64`:
 
 ```C
 static void set_bios_mode(void)
@@ -380,14 +374,14 @@ static void set_bios_mode(void)
 }
 ```
 
-The `set_bios_mode` function executes the `0x15` BIOS interrupt to tell the BIOS that [long mode](https://en.wikipedia.org/wiki/Long_mode) (if `bx == 2`) will be used.
+A função `set_bios_mode` executa o interrupt BIOS `0x15` informar a BIOS que [long mode](https://en.wikipedia.org/wiki/Long_mode) (se `bx == 2`) será usado. 
 
-Memory detection
+Detecção de memória
 --------------------------------------------------------------------------------
 
-The next step is memory detection through the `detect_memory` function. `detect_memory` basically provides a map of available RAM to the CPU. It uses different programming interfaces for memory detection like `0xe820`, `0xe801` and `0x88`. We will see only the implementation of the **0xE820** interface here.
+O próximo passo é detecção de memória através da função `detect_memory`. `detect_memory` fornece um mapa de RAM disponível para a CPU. Usa diferentes interfaces de programação para detecção de memória como `0xe820`, `0xe801` e `0x88`. Abordaremo apenas a implementação da interface **0xE820** aqui.
 
-Let's look at the implementation of the `detect_memory_e820` function from the [arch/x86/boot/memory.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/memory.c) source file. First of all, the `detect_memory_e820` function initializes the `biosregs` structure as we saw above and fills registers with special values for the `0xe820` call:
+Aqui está a implementação da função `detect_memory_e820` da fonte [arch/x86/boot/memory.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/memory.c). Primeiro de tudo, a função `detect_memory_e820` inicializa estrutura `biosregs` como visto acima e registros preenchidos com valores especais da chamada `0xe820`:
 
 ```assembly
     initregs(&ireg);
@@ -396,27 +390,26 @@ Let's look at the implementation of the `detect_memory_e820` function from the [
     ireg.edx = SMAP;
     ireg.di  = (size_t)&buf;
 ```
+* `ax` contém o número da função (0xe820 em nosso caso)
+* `cx` contém o tamanho do buffer que vai conter dados sobre a memória
+* `edx` deve conter o numero mágico `SMAP`
+* `es:di` deve conter o endereço do buffer que vai conter dados de memória
+* `ebx` tem que ser zero.
 
-* `ax` contains the number of the function (0xe820 in our case)
-* `cx` contains the size of the buffer which will contain data about the memory
-* `edx` must contain the `SMAP` magic number
-* `es:di` must contain the address of the buffer which will contain memory data
-* `ebx` has to be zero.
-
-Next is a loop where data about the memory will be collected. It starts with a call to the `0x15` BIOS interrupt, which writes one line from the address allocation table. For getting the next line we need to call this interrupt again (which we do in the loop). Before the next call `ebx` must contain the value returned previously:
+Próximo é um loop aonde dados sobre a memória ser colecionado. Começa com uma chamada para o interrupt BIOS `0x15`, que escreve uma linha de tabela de alocação de endereços. Para obter o próxima linha precisamos chamar o interrupt de novo (que nós fizemos no loop). Antes da próxima chamada  `ebx` contém o valor de retorno anteriormente:
 
 ```C
     intcall(0x15, &ireg, &oreg);
     ireg.ebx = oreg.ebx;
 ```
 
-Ultimately, this function collects data from the address allocation table and writes this data into the `e820_entry` array:
+Ultimamente, essa coleção de dados da função da tabela de alocação de endereços e escreve esses dados em array `e820_entry`:
 
-* start of memory segment
-* size  of memory segment
-* type of memory segment (whether the particular segment is usable or reserved)
+* Começa do segmento de memória
+* Tamanho do segmento de memóra
+* Tipo de segmento de memória (se o segmento particular é usable[utilizável] ou reserved[reservado])
 
-You can see the result of this in the `dmesg` output, something like:
+Você pode ver o resultado disso na saída `dmesg`, alguma coisa como:
 
 ```
 [    0.000000] e820: BIOS-provided physical RAM map:
@@ -428,10 +421,10 @@ You can see the result of this in the `dmesg` output, something like:
 [    0.000000] BIOS-e820: [mem 0x00000000fffc0000-0x00000000ffffffff] reserved
 ```
 
-Keyboard initialization
+Inicialização do teclado
 --------------------------------------------------------------------------------
 
-The next step is the initialization of the keyboard with a call to the [`keyboard_init`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c) function. At first `keyboard_init` initializes registers using the `initregs` function. It then calls the [0x16](http://www.ctyme.com/intr/rb-1756.htm) interrupt to query the status of the keyboard.
+O próximo passo é a inicialização do teclado com a chamada da função [`keyboard_init`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). Primeiro `keyboard_init` inicializa registros usando a função `initregs`. Então chamamos o interruptor [0x16](http://www.ctyme.com/intr/rb-1756.htm) para consultar o status do teclado.
 
 ```c
     initregs(&ireg);
@@ -440,7 +433,8 @@ The next step is the initialization of the keyboard with a call to the [`keyboar
     boot_params.kbd_status = oreg.al;
 ```
 
-After this it calls [0x16](http://www.ctyme.com/intr/rb-1757.htm) again to set the repeat rate and delay.
+Depois disso chama [0x16](http://www.ctyme.com/intr/rb-1757.htm) novamente definir
+a taxa de repetição e atraso (daley).
 
 ```c
     ireg.ax = 0x0305;   /* Set keyboard repeat rate */
