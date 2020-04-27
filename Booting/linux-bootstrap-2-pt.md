@@ -441,33 +441,32 @@ a taxa de repetição e atraso (daley).
     intcall(0x16, &ireg, NULL);
 ```
 
-Querying
+Consulta
 --------------------------------------------------------------------------------
 
-The next couple of steps are queries for different parameters. We will not dive into details about these queries but we will get back to them in later parts. Let's take a short look at these functions:
+Os próximos passos são consultas para parametros diferentes. Não entraremos em detalhes sobre essas consulas, mas voltaremos a eles em partes posteriores. Vamos dar uma rápida olhada nessas funções:
 
-The first step is getting [Intel SpeedStep](http://en.wikipedia.org/wiki/SpeedStep) information by calling the `query_ist` function. It checks the CPU level and if it is correct, calls `0x15` to get the info and saves the result to `boot_params`.
+O primeiro passo é obter a informação [Intel SpeedStep](http://en.wikipedia.org/wiki/SpeedStep) chmando a função `query_ist`. Checa o nível do CPU e se é correto, chama `0x15` para obter a info e salva o resultado para `boot_params`.
 
-Next, the [query_apm_bios](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/apm.c#L21) function gets [Advanced Power Management](http://en.wikipedia.org/wiki/Advanced_Power_Management) information from the BIOS. `query_apm_bios` calls the `0x15` BIOS interruption too, but with `ah` = `0x53` to check `APM` installation. After `0x15` finishes executing, the `query_apm_bios` functions check the `PM` signature (it must be `0x504d`), the carry flag (it must be 0 if `APM` supported) and the value of the `cx` register (if it's 0x02, the protected mode interface is supported).
+Próximo, a função [query_apm_bios](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/apm.c#L21) recebe a informação [Advanced Power Management](http://en.wikipedia.org/wiki/Advanced_Power_Management) da BIOS. `query_apm_bios` chama interruption da BIOS `0x15` também,  mas com `ah` = `0x53` para checar instalação do `APM`. Depois o `0x15` dinaliza a execução, a função `query_apm_bios` checa a assinatura `PM` (deve ser `0x504d`), o carry flag (deve ser 0 se suportar `APM`) e o valor do registro `cx` (se 0x02, a interface modo protegido é suportado).
 
-Next, it calls `0x15` again, but with `ax = 0x5304` to disconnect the `APM` interface and connect the 32-bit protected mode interface. In the end, it fills `boot_params.apm_bios_info` with values obtained from the BIOS.
+Próximo, chama `0x15` novamente, mas com `ax = 0x5304` desconecta a interface `APM` e conecta a interface no modo protegido de 32-bit. No final, preenche `boot_params.apm_bios_info` com o valor obtido da BIOS.
 
-Note that `query_apm_bios` will be executed only if the `CONFIG_APM` or `CONFIG_APM_MODULE` compile time flag was set in the configuration file:
+Note que `query_apm_bios` será executado apenas se a compilação for definido as flags `CONFIG_APM` ou `CONFIG_APM_MODULE` no arquivo de configuração:
 
 ```C
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
     query_apm_bios();
 #endif
 ```
+O último e a função [`query_edd`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/edd.c#L122) que consulta a informação `Enhanced Disk Drive` da BIOS. Iremos detalhar Como `query_edd` é implementado.
 
-The last is the [`query_edd`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/edd.c#L122) function, which queries `Enhanced Disk Drive` information from the BIOS. Let's look at how `query_edd` is implemented.
+Primeiro de tudo, lê a opção [edd](https://github.com/torvalds/linux/blob/v4.16/Documentation/admin-guide/kernel-parameters.rst) da linha de comando do kernel e se foi definida para `off então ` `query_edd` apenas retorna.
 
-First of all, it reads the [edd](https://github.com/torvalds/linux/blob/v4.16/Documentation/admin-guide/kernel-parameters.rst) option from the kernel's command line and if it was set to `off` then `query_edd` just returns.
-
-If EDD is enabled, `query_edd` goes over BIOS-supported hard disks and queries EDD information in the following loop:
+Se o EDD estiver ativado, o `query_edd` percorre os discos rígidos suportados pelo BIOS e consulta as informações do EDD no seguinte loop:
 
 ```C
-for (devno = 0x80; devno < 0x80+EDD_MBR_SIG_MAX; devno++) {
+for (devno = 0x80; devno < 0x80 + EDD_MBR_SIG_MAX; devno++) {
     if (!get_edd_info(devno, &ei) && boot_params.eddbuf_entries < EDDMAXNR) {
         memcpy(edp, &ei, sizeof ei);
         edp++;
@@ -478,17 +477,15 @@ for (devno = 0x80; devno < 0x80+EDD_MBR_SIG_MAX; devno++) {
     ...
     }
 ```
+Onde `0x80` é o primeiro hd e o valor do macro `EDD_MBR_SIG_MAX` é 16. Coleção dados em um array de estrutura [edd_info](https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/edd.h). `get_edd_info` checa que EDD é presente por invocar o inerrupt `0x13` com `ah` como `0x41` e se EDD é presente `get_edd_info` novamente chama o interrupt `0x13`, com `ah` `0x41` e se EDD é presente `get_edd_info` chama de novo o interrupt `0x13`, mas com `ah` como `0x48` e `si` contendo o enereço do buffer aonde informação EDD vai ser armazenado.
 
-where `0x80` is the first hard drive and the value of the `EDD_MBR_SIG_MAX` macro is 16. It collects data into an array of [edd_info](https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/edd.h) structures. `get_edd_info` checks that EDD is present by invoking the `0x13` interrupt with `ah` as `0x41` and if EDD is present, `get_edd_info` again calls the `0x13` interrupt, but with `ah` as `0x48` and `si` containing the address of the buffer where EDD information will be stored.
 
-Conclusion
+Conclusão
 --------------------------------------------------------------------------------
 
-This is the end of the second part about the insides of the Linux kernel. In the next part, we will see video mode setting and the rest of the preparations before the transition to protected mode and directly transitioning into it.
+Esse é o final do segunda parte sobre interior do kernel do Linux. Na próxima parte, veremos a configuração do modo de vídeo e o restante dos preparativos antes da transição para o modo protegido e a transição direta para ele.
 
-If you have any questions or suggestions write me a comment or ping me at [twitter](https://twitter.com/0xAX).
-
-**Please note that English is not my first language, And I am really sorry for any inconvenience. If you find any mistakes please send me a PR to [linux-insides](https://github.com/0xAX/linux-internals).**
+Se você ter qualquer erro de tradução me escreva um comentário ou um ping no [twitter](https://twitter.com/rodgger1).
 
 Links
 --------------------------------------------------------------------------------
@@ -498,11 +495,11 @@ Links
 * [Long mode](http://en.wikipedia.org/wiki/Long_mode)
 * [Nice explanation of CPU Modes with code](http://www.codeproject.com/Articles/45788/The-Real-Protected-Long-mode-assembly-tutorial-for)
 * [How to Use Expand Down Segments on Intel 386 and Later CPUs](http://www.sudleyplace.com/dpmione/expanddown.html)
-* [earlyprintk documentation](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/earlyprintk.txt)
-* [Kernel Parameters](https://github.com/torvalds/linux/blob/v4.16/Documentation/admin-guide/kernel-parameters.rst)
+* [documentação earlyprintk](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/earlyprintk.txt)
+* [Parâmetro do  Kernel](https://github.com/torvalds/linux/blob/v4.16/Documentation/admin-guide/kernel-parameters.rst)
 * [Serial console](https://github.com/torvalds/linux/blob/v4.16/Documentation/admin-guide/serial-console.rst)
 * [Intel SpeedStep](http://en.wikipedia.org/wiki/SpeedStep)
 * [APM](https://en.wikipedia.org/wiki/Advanced_Power_Management)
-* [EDD specification](http://www.t13.org/documents/UploadedDocuments/docs2004/d1572r3-EDD3.pdf)
-* [TLDP documentation for Linux Boot Process](http://www.tldp.org/HOWTO/Linux-i386-Boot-Code-HOWTO/setup.html) (old)
-* [Previous Part](linux-bootstrap-1.md)
+* [Especificação EDD](http://www.t13.org/documents/UploadedDocuments/docs2004/d1572r3-EDD3.pdf)
+* [Documentação TLDP para Linux Boot Process](http://www.tldp.org/HOWTO/Linux-i386-Boot-Code-HOWTO/setup.html) (velho)
+* [Parte anterior](linux-bootstrap-1.md)
