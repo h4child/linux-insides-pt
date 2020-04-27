@@ -4,23 +4,23 @@ Processo de inicialização do kernel Part 3.
 Inicialização do modo vídeo e transição para o modo protegido
 --------------------------------------------------------------------------------
 
-This is the third part of the `Kernel booting process` series. In the previous [part](linux-bootstrap-2.md#kernel-booting-process-part-2), we stopped right before the call to the `set_video` routine from [main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
+Esse é a terceira parte da série `processo booting do kernel`.A [parte anterior](linux-bootstrap-2.md#kernel-booting-process-part-2), nós paramos logo antes a chamada para a rotina `set_video` do [main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
 
-In this part, we will look at:
+Nesta parte, nós veremos:
 
-* video mode initialization in the kernel setup code,
-* the preparations made before switching into protected mode,
-* the transition to protected mode
+* inicialização do modo vídeo na inicialização do linux,
+* os preparativos feitos antes de mudar para o modo protegido,
+* a transição para modo protegido
 
-**NOTE** If you don't know anything about protected mode, you can find some information about it in the previous [part](linux-bootstrap-2.md#protected-mode). Also, there are a couple of [links](linux-bootstrap-2.md#links) which can help you.
+**NOTA** se você não sabe qualquer coisa sobre modo protegido, você pode encontrar algumas informações sobre [parte anterior](linux-bootstrap-2.md#protected-mode). Também, há outros [links](linux-bootstrap-2.md#links) que pode ajudar você.
 
-As I wrote above, we will start from the `set_video` function which is defined in the [arch/x86/boot/video.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/video.c) source code file. We can see that it starts by first getting the video mode from the `boot_params.hdr` structure:
+Como eu escrevi, começaremos da função `set_video` que está definida no [arch/x86/boot/video.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/video.c). Começa obtendo o modo video da estrutura `boot_params.hdr`:
 
 ```C
 u16 mode = boot_params.hdr.vid_mode;
 ```
 
-which we filled in the `copy_boot_params` function (you can read about it in the previous post). `vid_mode` is an obligatory field which is filled by the bootloader. You can find information about it in the kernel `boot protocol`:
+que nós preenchemos na função`copy_boot_params` (lê sobre post anterior). `vid_mode`é um campo obrigatório que é preenchido pelo bootloader. Vocé encontrará informação sobre `boot protocol` do kernel:
 
 ```
 Offset	Proto	Name		Meaning
@@ -28,7 +28,7 @@ Offset	Proto	Name		Meaning
 01FA/2	ALL	    vid_mode	Video mode control
 ```
 
-As we can read from the linux kernel boot protocol:
+Como podemos ler do boot protocol:
 
 ```
 vga=<mode>
@@ -40,9 +40,9 @@ vga=<mode>
 	line is parsed.
 ```
 
-So we can add the `vga` option to the grub (or another bootloader's) configuration file and it will pass this option to the kernel command line. This option can have different values as mentioned in the description. For example, it can be an integer number `0xFFFD` or `ask`. If you pass `ask` to `vga`, you will see a menu like this:
+Então nós podemos adicionar opção `vga` para a arquivo de configuração do grub (ou outro bootloader) e passaremos essa opção para linha de comando do kernel. Essa opção pode ter diferentes valores como mencionados na descrição. Por examplo, pode ser um número inteiro `0xFFFD` ou `ask`. Se você passar `ask` para `vga`, você verá um menun como esse:
 
-![video mode setup menu](images/video_mode_setup_menu.png)
+![menu setup do modo vídeo](images/video_mode_setup_menu.png)
 
 which will ask to select a video mode. We will look at its implementation, but before diving into the implementation we have to look at some other things.
 
