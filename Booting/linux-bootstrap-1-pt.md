@@ -8,18 +8,18 @@ Se você leu as minhas [postagens anteriores](https://0xax.github.io/categories/
 
 Eu tenho um grande interesse em entender como as coisas funcionam em baixo nível, como os programas executam no computador, como são localizados na memória, como o kernel administra os processos e memória, como a stack (pilha) de rede funcionam em baixo nível e muitas outras coisas. Então, eu decidi escrever uma série de postagens sobre kernel Linux para arquitetura **x86_64**.
 
-Note que e não sou um profisional kernel hacker e eu não escrevo código para o kernel no trabalho. É apenas um hobby. Eu apenas gosto das coisas em baixo nível e é interessante para eu ver como essas coisas funcionam. Então se você perceber algo confuso ou se você ter qualquer perguntas/observações, me avise no twitter [autor 0xAX](https://twitter.com/0xAX) [tradutor rodgger](https://twitter.com/rodgger1), 
+Note que e não sou um profissional kernel hacker e eu não escrevo código para o kernel no trabalho. É apenas um hobby. Eu apenas gosto das coisas em baixo nível e é interessante para eu ver como essas coisas funcionam. Então se você perceber algo confuso ou se você ter qualquer perguntas/observações, me avise no twitter [autor 0xAX](https://twitter.com/0xAX) [tradutor rodgger](https://twitter.com/rodgger1), 
 
 Se você encontrar alguma coisa errada com meu português ou sobre o conteúdo, sinta-se livre para enviar um pull request.
 
-*Note que esse não é uma documentção oficial, apenas aprendendo e compartilhanddo conhecimento.*
+*Note que esse não é uma documentação oficial, apenas aprendendo e compartilhando conhecimentos.*
 
 **Conhecimento requeridos**
 
 * Entender código C
 * Entender código assembly (AT&T syntax)
 
-De qualquer forma, se você esta apenas começando aprender ferramentas, eu tentarei explicar algumas partes durante este e as sequintes postagens. Bem, esse é o final da introdução simples. Deixe começar mergulhar no kernel Linux e coisas de baixo nível!
+De qualquer forma, se você esta apenas começando aprender ferramentas, eu tentarei explicar algumas partes durante este e as postagens seguintes. Bem, esse é o final da introdução simples. Deixe começar mergulhar no kernel Linux e coisas de baixo nível!
 
 Eu comecei a escrever estas postagens na versão `3.18` do kernel Linux, e muitas coisas mudaram deste aquele tempo. Se houver mudanças, eu atualizarei a postagens adequadamente.
 
@@ -27,20 +27,20 @@ Eu comecei a escrever estas postagens na versão `3.18` do kernel Linux, e muita
 O Mágico Botão Power(ligar), o que acontece depois?
 --------------------------------------------------------------------------------
 
-Embora isso é uma série de postagens sobre kernel linux, não comearemos diretamente no código do kernel. Assim que pressionou o botão mágico power no laptop ou computador desktop, começa funcionar. A placa-mãe envia um sinal para [power suply](https://en.wikipedia.org/wiki/Power_supply)[(similar pt)](https://pt.wikipedia.org/wiki/Fonte_de_alimentação) e tenta iniciar a CPU.A CPU reseta todos os dados no registro e valor predefinido para cada um deles
+Embora isso é uma série de postagens sobre kernel linux, não começaremos diretamente no código do kernel. Assim que pressionar o mágico botão power no laptop ou computador desktop, começa funcionar. A placa-mãe envia um sinal para [power suply](https://en.wikipedia.org/wiki/Power_supply)[(similar pt)](https://pt.wikipedia.org/wiki/Fonte_de_alimentação) e tenta iniciar a CPU.A CPU reset todos os dados nos registros e predefini para cada um deles
 
-O [80386](https://en.wikipedia.org/wiki/Intel_80386)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_80386) e os CPUs porteriores definem os seguintes dados predefinidos nos registros da CPU após resetar.
+O [80386](https://en.wikipedia.org/wiki/Intel_80386)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_80386) e os CPUs posteriores definem os seguintes dados predefinidos nos registros da CPU após reset.
 
 ```
 IP          0xFFF0
 CS selector 0xF000
 CS base     0xFFFF0000
 ```
-O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, qual significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 mebibyte`. Mas apenas tem registros `16-bit`, qual tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
+O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, que significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 mebibyte`. Mas apenas tem registros `16-bit` que tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
 
-A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é usado para utilizar todo o espaço de endereço disponível. Toda memória é dividida em paquenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
+A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é usado para utilizar todo o espaço de endereço disponível. Toda memória é dividida em pequenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
 
-Um endereço consiste em duas partes: um seletor de segmento , qual tem uma base de endereço e um offset (deslocamento) da base de endereço. No modo real, o endereço da base asociada de um seletor de segmento é `seletor de segmento * 16`. Então, para obter um endereço físico na memória, nós precisamos multiplicar o seletor do segmento por `16` e adcionar o deslocamento  para isso:
+Um endereço consiste em duas partes: um seletor de segmento que tem uma base de endereço e um offset (deslocamento) da base de endereço. No modo real, o endereço da base associada de um seletor de segmento é `seletor de segmento * 16`. Então, para obter um endereço físico na memória, nós precisamos multiplicar o seletor do segmento por `16` e adicionar o deslocamento  para isso:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
@@ -61,11 +61,11 @@ Mas, pegarmos o maior seletor de segmentos e offset, `0xFFFF:0xFFFF`, então o e
 '0x10ffef'
 ```
 
-O qual é `65520` bytes a mais que 1 mebibyte `(0x10ffef = 1 mebibyte + 65520)`. Como apenas um mebibyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
+O qual é `65520` bytes a mais que 1 mebibyte `(0x10ffef = 1 mebibyte + 65521)`. Como apenas um mebibyte é acessível em modo real, `0x10FFEF` torna-se `0x00FFEF` com a [linha A20(A20 line)](https://en.wikipedia.org/wiki/A20_line) desativada.
 
 Ok, agora nós conhecemos um pouco sobre modo real e endereçamento de memória. Deixe voltar para a conversa dos valores do registradores depois do resetar.
 
-O registro `CS` consiste de duas partes: o seletor de segmento visível e o endereço base oculto. Enquanto o endereço base é normalmente formato multiplicando o valor do seletor de segmento por 16, durante o reset no hardware o selector de segmento no registro CS é carregado com `0xF000` e o endereço base é carregado com `0xFFFF0000`. O processador usa essa base de endereço especial até  `CS` mudar.
+O registro `CS` consiste de duas partes: o seletor de segmento visível e o endereço base oculto. O endereço base é normalmente formato multiplicando o valor do seletor de segmento por 16, durante o reset no hardware o seletor de segmento no registro CS é carregado com `0xF000` e o endereço base é carregado com `0xFFFF0000`. O processador usa essa base de endereço especial até  `CS` mudar.
 
 O endereço inicial é formato adicionando o endereço base ao valor no registro EIP:
 
@@ -74,7 +74,7 @@ O endereço inicial é formato adicionando o endereço base ao valor no registro
 '0xfffffff0'
 ```
 
-Obtemos `0xFFFFFFF0`, que é 16 bytes abaixo dos 4GiB. Esse ponteiro é chamado de [redefinir vetor(reset vector)](https://en.wikipedia.org/wiki/Reset_vector). É a localização de memória no qual a CPT esperar encontrar o primeira instrução para executar depois de resetar. Contém uma instrução [jump](https://en.wikipedia.org/wiki/JMP_%28x86_instruction%29)[(similar pt)](http://marco.uminho.pt/~joao/Computacao2/node47.html) (`jmp`) que usualmente aponta para a entrada da [Bios](https://en.wikipedia.org/wiki/BIOS)[(similar pt)](https://pt.wikipedia.org/wiki/BIOS)(Basic Input/Output System). Por exemplo, se olharmos no código fonte(`src/cpu/x86/16bit/reset16.inc` [github](https://github.com/coreboot/coreboot/blob/master/src/cpu/x86/16bit/reset16.inc)) [coreboot](https://www.coreboot.org/), veremos:
+Obtemos `0xFFFFFFF0`, que é 16 bytes abaixo dos 4GiB. Esse ponteiro é chamado de [redefinir vetor(reset vector)](https://en.wikipedia.org/wiki/Reset_vector). É a localização de memória no qual a CPU esperar encontrar o primeira instrução para executar depois do reset. Contém uma instrução [jump](https://en.wikipedia.org/wiki/JMP_%28x86_instruction%29)[(similar pt)](http://marco.uminho.pt/~joao/Computacao2/node47.html) (`jmp`) que usualmente aponta para a entrada da [Bios](https://en.wikipedia.org/wiki/BIOS)[(similar pt)](https://pt.wikipedia.org/wiki/BIOS)(Basic Input/Output System). Por exemplo, se olharmos no código fonte(`src/cpu/x86/16bit/reset16.inc` [github](https://github.com/coreboot/coreboot/blob/master/src/cpu/x86/16bit/reset16.inc)) [coreboot](https://www.coreboot.org/), veremos:
 
 ```assembly
     .section ".reset", "ax", %progbits
@@ -203,7 +203,7 @@ Agora que a BIOS tem que escolher um dispositivo para inicializar e transferir o
 
 A função `grub_main` inicializa o console, obtém o endereço base para módulos, defini o dispositivo principal, carrega/analisa o arquivos de configuração grub e etc. No final da execução, a função `grub_main` move o grub para o modo normal. A função `grub_normal_execute` (do `grub-core/normal/main.c` no [código fonte](https://github.com/rhboot/grub2/blob/master/grub-core/normal/main.c)) completa a preparação final e mostra um menu para selecionar o sistema operacional. Quando selecionamos a entrada do menu grub, executa a função `grub_menu_execute_entry`, executando o comando grub `boot` e inicializando o sistema operacional selecionado.
 
-Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de inicialização do kernel, que começa no ofsset (deslocamento) `0x01f1` do código de inicialização Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
+Como nós lemos no protocolo boot do kernel, o bootloader deve ler e preencher alguns campos do cabeçalho de inicialização do kernel, que começa no ofset (deslocamento) `0x01f1` do código de inicialização Kernel. Você pode olhar no [linker do script](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) do boot para confirmar o valor do offset. O cabeçalho do kernel começa em [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
 
 ```assembly
     .globl hdr
@@ -217,7 +217,7 @@ hdr:
     boot_flag:   .word 0xAA55
 ```
 
-O bootloader deve preencher e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354))) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho de inicialição do kernel por agora, mas devemos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
+O bootloader deve preencher esse e o resto do cabeçalho (que são apenas marcados como sendo tipo `write` (escrever) em protocolo boot, tal como neste [exemplo](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L354)) com valores recebidos da linha de comando ou calculado durante a inicialização. (Nós não iremos descrever ou explicações para todos os campos do cabeçalho de inicialização do kernel por agora, mas devemos fazer quando discutiremos como o kernel usa eles. Você pode encontrar uma descrição de todos os campos no [protocolo boot](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156).)
 
 Como nós podemos ver no protocolo boot do kernel, a memória será mapeada da seguinte maneira após o carregamento do kernel:
 
@@ -233,7 +233,7 @@ X+10000  +------------------------+
          | Stack/heap             | uso do código em modo real do kernel
 X+08000  +------------------------+
          | Kernel setup           | código do modo real do kernel.
-         | Kernel boot sector     | O serto boot do kernel legado.
+         | Kernel boot sector     | O setor boot do kernel legado.
        X +------------------------+
          | Boot loader            | <- ponto de entrada do setor boot 0x7C00
 001000   +------------------------+
@@ -323,7 +323,7 @@ _start:
     //
 ```
 
-Aqui nós podemos ver um upcode da intrução `jmp` (`0xeb`) que pula para o ponto `start_of_setup-1f`. Em notação `Nf`, `2f`, por exemplo, refere-se ao local do rótulo `2:`. Nosso caso, é rótulo `1:` que é presente depois de pular e contém o resto do [cabeçalho de inicialização]((https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156)) de inicialização. Logo depois do cabeçalho, nós vemos a seção `.entrytext`, que começa no rótulo `start_of_setup`.
+Aqui nós podemos ver um upcode da intrução `jmp` (`0xeb`) que pula para o ponto `start_of_setup-1f`. Em notação `Nf`, `2f`, por exemplo, refere-se ao local do rótulo `2:`. Nosso caso, é rótulo `1:` que é presente depois de pular e contém o resto do [cabeçalho de inicialização](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt#L156) de inicialização. Logo depois do cabeçalho, nós vemos a seção `.entrytext`, que começa no rótulo `start_of_setup`.
 
 Esse é o primeiro código que realmente executa (além da instrução jump anteriormente, claro). Depois a inicialização do kernel receber o controle do bootloader, a primeira instrução `jmp` é localizada no offset `0x200` do começo do modo real do kernel, ou seja, depois dos primeiros 512 bytes. Esse pode ser visto em ambos o protocolo boot do kernel linux e o código fonte do GRUB 2:
 
@@ -368,7 +368,7 @@ _start:
     .byte start_of_setup-1f
 ```
 
-Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L46). Nós precisamos alinhar `cs` do `0x1020` para `0x1000`, como todos outros registros de segmento. Depois que, nós definimos a  (pilha):
+Que esta no offset `512` bytes do [4d 5a](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L46). Nós precisamos alinhar `cs` do `0x1020` para `0x1000`, como todos outros registros de segmento. Depois que, nós definimos a  (stack):
 
 ```assembly
     pushw   %ds
@@ -396,7 +396,7 @@ Isso pode levar a 3 cenários diferentes:
 * `ss` é inválido e a bandeira (flag) `CAN_USE_HEAP` é definido (veja abaixo)
 * `ss` é inválido e a bandeira (flag) `CAN_USE_HEAP` não é definido (veja abaixo)
 
-Vamos inspecionar todos os três cénário:
+Vamos inspecionar todos os três cenário:
 
 * `ss` tem um endereço correta (`0x1000`). Neste caso, nós vamos para rótulo [2](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S#L589):
 
@@ -456,7 +456,7 @@ Os dois últimos passos que precisa acontecer antes de pular para a main no cód
 
 Isso simplesmente compara o [setup_sig](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) com o número mágico `0x5a5aaa55`. Se eles não são iguais, um erro fatal é reportado.
 
-Se o número mágico combinar, sabendo definir do registros de segmento correto e uma pilha, nós apenas precisamos definir a seção BSS antes de pular no código C.
+Se o número mágico combinar, sabendo definir do registros de segmento correto e uma stack, nós apenas precisamos definir a seção BSS antes de pular no código C.
 
 A seção BSS é usado para armazenar estaticamente, dados não inicializado. Linux cuidadosamente garante essa área da memória primeiro seja zerado usando o seguinte código:
 
