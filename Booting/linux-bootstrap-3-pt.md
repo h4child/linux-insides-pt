@@ -42,57 +42,58 @@ vga=<mode>
 
 Então nós podemos adicionar opção `vga` para a arquivo de configuração do grub (ou outro bootloader) e passaremos essa opção para linha de comando do kernel. Essa opção pode ter diferentes valores como mencionados na descrição. Por examplo, pode ser um número inteiro `0xFFFD` ou `ask`. Se você passar `ask` para `vga`, você verá um menun como esse:
 
-![menu setup do modo vídeo](images/video_mode_setup_menu.png)
+![configuração do menu em modo vídeo](images/video_mode_setup_menu.png)
 
-which will ask to select a video mode. We will look at its implementation, but before diving into the implementation we have to look at some other things.
+Que questionará para selecionar um modo vídeo. Nós observaremos a implementação, mas antes dividimos a implementação temos que olhar algumas outras coisas.
 
-Kernel data types
+
+Tipo de dados do kernel
 --------------------------------------------------------------------------------
 
-Earlier we saw definitions of different data types like `u16` etc. in the kernel setup code. Let's look at a couple of data types provided by the kernel:
+Anteriormente nós vimos a definições de diferentes tipo de dados como `u16` etc. Vejamos alguns tipos de dados fornecido pelo kernel:
 
+u = unsigned
 
-| Type | char | short | int | long | u8 | u16 | u32 | u64 |
+| Tipo | char | short | int | long | u8 | u16 | u32 | u64 |
 |------|------|-------|-----|------|----|-----|-----|-----|
 | Size |  1   |   2   |  4  |   8  |  1 |  2  |  4  |  8  |
 
-If you read the source code of the kernel, you'll see these very often and so it will be good to remember them.
 
-Heap API
+Se você ler o código fonte do kernel, verá com muita frequência.
+
+
+API Heap
 --------------------------------------------------------------------------------
 
-After we get `vid_mode` from `boot_params.hdr` in the `set_video` function, we can see the call to the `RESET_HEAP` function. `RESET_HEAP` is a macro which is defined in [arch/x86/boot/boot.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/boot.h) header file.
+Depois obtivemos `vid_mode` do `boot_params.hdr` na função `set_video`, podemos ver a chamada para a função `RESET_HEAP`. `RESET_HEAP` é um macro que é definido no arquivo do cabeçalho [arch/x86/boot/boot.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/boot.h).
 
-This macro is defined as:
+Esse macro é definido como:
 
 ```C
 #define RESET_HEAP() ((void *)( HEAP = _end ))
 ```
+Se você ler a segunda parte, você irá lembrar que inicializamos o heap com a função [`init_heap`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). Nós temos macros de utilidades e funções para gerenciar o heap que são definidos no arquivo de cabeçalho `arch/x86/boot/boot.h`.
 
-If you have read the second part, you will remember that we initialized the heap with the [`init_heap`](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c) function. We have a couple of utility macros and functions for managing the heap which are defined in `arch/x86/boot/boot.h` header file.
-
-They are:
+Eles são:
 
 ```C
 #define RESET_HEAP()
 ```
+Como nós vimos acima, redefini o heap pelo configurando a variável `HEAP` para `_end`, onde `_end` é apenas `extern char _end[];`
 
-As we saw just above, it resets the heap by setting the `HEAP` variable to `_end`, where `_end` is just `extern char _end[];`
-
-Next is the `GET_HEAP` macro:
+Próximo é o macro `GET_HEAP`:
 
 ```C
 #define GET_HEAP(type, n) \
 	((type *)__get_heap(sizeof(type),__alignof__(type),(n)))
 ```
+para alocação heap. É chamado a função interno `__get_heap` com 3 parâmetro:
 
-for heap allocation. It calls the internal function `__get_heap` with 3 parameters:
+* o tamanho do tipo de dados ser alocado para
+* especificar `__alignof__(type)` como variável deste tipo são ser alinhado 
+* especificar `n` como muito itens alocado.
 
-* the size of the datatype to be allocated for
-* `__alignof__(type)` specifies how variables of this type are to be aligned
-* `n` specifies how many items to allocate
-
-The implementation of `__get_heap` is:
+A implementação do `__get_heap` é:
 
 ```C
 static inline char *__get_heap(size_t s, size_t a, size_t n)
@@ -106,15 +107,14 @@ static inline char *__get_heap(size_t s, size_t a, size_t n)
 }
 ```
 
-and we will further see its usage, something like:
+e veremos ainda seu uso, algo como:
 
 ```C
 saved.data = GET_HEAP(u16, saved.x * saved.y);
 ```
+Tentaremos entender como trabalha `__get_heap`. Podemos ver aqui que `HEAP` (qual é igual para `_end` depois `RESET_HEAP()`) é atribuído o endereço da memória alinhado de acordo com o parâmetro `a`. Depois disso salvamos o endereço de memória do `HEAP` para a variável `tmp`, move `HEAP` para o final do bloco alocado e retorne `tmp`, que é o endereço inicial da memória alocada.
 
-Let's try to understand how `__get_heap` works. We can see here that `HEAP` (which is equal to `_end` after `RESET_HEAP()`) is assigned the address of the aligned memory according to the `a` parameter. After this we save the memory address from `HEAP` to the `tmp` variable, move `HEAP` to the end of the allocated block and return `tmp` which is the start address of allocated memory.
-
-And the last function is:
+E a última função é:
 
 ```C
 static inline bool heap_free(size_t n)
@@ -123,18 +123,27 @@ static inline bool heap_free(size_t n)
 }
 ```
 
-which subtracts value of the `HEAP` pointer from the `heap_end` (we calculated it in the previous [part](linux-bootstrap-2.md)) and returns 1 if there is enough memory available for `n`.
+que subtrai o valor do ponteiro `HEAP` do `heap_end` (nós calculamos na [parte](linux-bootstrap-2.md) anterior) e retorna 1 se houver memória suficiente disponível para `n`.
 
-That's all. Now we have a simple API for heap and can setup video mode.
+Que é tudo. Agora nós temos um simples API para heap e podemos definir modo de vídeo.
 
-Set up video mode
+Configurar o modo vídeo
 --------------------------------------------------------------------------------
 
-Now we can move directly to video mode initialization. We stopped at the `RESET_HEAP()` call in the `set_video` function. Next is the call to  `store_mode_params` which stores video mode parameters in the `boot_params.screen_info` structure which is defined in [include/uapi/linux/screen_info.h](https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/screen_info.h) header file.
+Podemos mover diretamente para inicialização do modo vídeo. Paramos na chamada `RESET_HEAP()` na função `set_video`. Em seguida é a chamada para `store_mode_params` que armazenar parâmetro no modo vídeo na estrutura `boot_params.screen_info` que é definido no arquivo de cabeçalho [include/uapi/linux/screen_info.h](https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/screen_info.h).
 
-If we look at the `store_mode_params` function, we can see that it starts with a call to the `store_cursor_position` function. As you can understand from the function name, it gets information about the cursor and stores it.
+Se nós olhar na função `store_mode_params`, podemos ver que está começando com uma chamada para  função `store_cursor_position`. Como você pode entender do nome da função, ele obtém informção sobre o cursor e as armazena.
 
-First of all, `store_cursor_position` initializes two variables which have type `biosregs` with `AH = 0x3`, and calls the `0x10` BIOS interruption. After the interruption is successfully executed, it returns row and column in the `DL` and `DH` registers. Row and column will be stored in the `orig_x` and `orig_y` fields of the `boot_params.screen_info` structure.
+Primeiro de tudo, `store_cursor_position` inicializa duas variáveis que tem o tipo `biosregs` com `AH = 0x3`e chama interrupção da BIOS `0x10`. Depois a interrupção é executado com sucesso retorna linha e colunas nos registros `DL` e `DH`. Linha e coluna serão armazenado nos campos `orig_x` e `orig_y` da estrutura `boot_params.screen_info`.
+
+
+
+
+
+
+
+
+
 
 After `store_cursor_position` is executed, the `store_video_mode` function will be called. It just gets the current video mode and stores it in `boot_params.screen_info.orig_video_mode`.
 
