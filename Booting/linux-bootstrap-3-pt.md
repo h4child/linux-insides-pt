@@ -136,31 +136,27 @@ Se nós olhar na função `store_mode_params`, podemos ver que está começando 
 
 Primeiro de tudo, `store_cursor_position` inicializa duas variáveis que tem o tipo `biosregs` com `AH = 0x3`e chama interrupção da BIOS `0x10`. Depois a interrupção é executado com sucesso retorna linha e colunas nos registros `DL` e `DH`. Linha e coluna serão armazenado nos campos `orig_x` e `orig_y` da estrutura `boot_params.screen_info`.
 
+Depois `store_cursor_position` é executado, a função `store_video_mode` será chamado. Ele apenas adquiri o modo vídeo atual e armazena em `boot_params.screen_info.orig_video_mode`.
 
-
-
-
-
-
-
-
-
-After `store_cursor_position` is executed, the `store_video_mode` function will be called. It just gets the current video mode and stores it in `boot_params.screen_info.orig_video_mode`.
-
-After this, `store_mode_params` checks the current video mode and sets the `video_segment`. After the BIOS transfers control to the boot sector, the following addresses are for video memory:
+Depois disso, `store_mode_params` checa o modo vídeo atual e defini o `video_segment`. Depois a BIOS transfere o controle para o setor do boot, o endereço seguinte são para memória de vídeo:
 
 ```
-0xB000:0x0000 	32 Kb 	Monochrome Text Video Memory
-0xB800:0x0000 	32 Kb 	Color Text Video Memory
+0xB000:0x0000 	32 Kb 	Memória de vídeo de texto monocromático
+0xB800:0x0000 	32 Kb 	Memória de vídeo de texto com cor
 ```
-
-So we set the `video_segment` variable to `0xb000` if the current video mode is MDA, HGC, or VGA in monochrome mode and to `0xb800` if the current video mode is in color mode. After setting up the address of the video segment, the font size needs to be stored in `boot_params.screen_info.orig_video_points` with:
+Enão definimos a variável `video_segment` para `0xb000` se o modo de vídeo atual é MDA, HGC ou VGA modo monocromático e para `0xb800` se o modo vídeo atual está em modo colorido. Depois configuramos o endereço do segmento de vídeo, o tamanho da fonte precisa ser armazenado em `boot_params.screen_info.orig_video_points` com:
 
 ```C
 set_fs(0);
 font_size = rdfs16(0x485);
 boot_params.screen_info.orig_video_points = font_size;
 ```
+
+
+
+
+
+
 
 First of all, we put 0 in the `FS` register with the `set_fs` function. We already saw functions like `set_fs` in the previous part. They are all defined in [arch/x86/boot/boot.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/boot.h). Next, we read the value which is located at address `0x485` (this memory location is used to get the font size) and save the font size in `boot_params.screen_info.orig_video_points`.
 
