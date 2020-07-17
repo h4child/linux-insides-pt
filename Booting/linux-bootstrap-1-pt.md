@@ -167,7 +167,7 @@ Apenas explicado acima. Temos apenas um registro geral de 16-bit, que tem um val
 '0x10ffef'
 ```
 
-Onde `0x10ffef` é o maior endereço `0 até 0x10ffef`, com total `1MiB + 64KiB - 16B`. O processador [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086)  (qual foi o primeiro processador com modo real), em contraste, tem 20-bit de linha de endereço. Como `2^20 = 1048576 (0 até 2^20-1)` é 1MiB, isso significa que a memória disponivel atual é 1MiB. 
+Onde `0x10ffef` é o maior endereço `0 até 0x10ffef`, com total `(1MB + 64KB - 16B) - 1`. O processador [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086)  (qual foi o primeiro processador com modo real), em contraste, tem 20-bit de linha de endereço. Como `2^20 = 1048576 (0 até 2^20-1)` é 1MiB, isso significa que a memória disponivel atual é 1MiB. 
 
 Em geral, memória em modo real é mapeada como seguinte:
 
