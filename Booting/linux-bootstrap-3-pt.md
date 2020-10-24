@@ -152,22 +152,18 @@ font_size = rdfs16(0x485);
 boot_params.screen_info.orig_video_points = font_size;
 ```
 
+Primeiro de tudo nós colocamos 0 no registro `FS` com a função `set_fs`. Nós já vimos a função como `set_fs` na parte anterior. Eles são todos definidos no [arch/x86/boot/boot.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/boot.h). Nós vimos o valor que é localizado no endereço `0x485` (localização da memória é usada para ter o tamanho da fonte) e salvar o tamanho da fonte em `boot_params.screen_info.orig_video_points`.
 
-
-
-
-
-
-First of all, we put 0 in the `FS` register with the `set_fs` function. We already saw functions like `set_fs` in the previous part. They are all defined in [arch/x86/boot/boot.h](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/boot.h). Next, we read the value which is located at address `0x485` (this memory location is used to get the font size) and save the font size in `boot_params.screen_info.orig_video_points`.
 
 ```C
 x = rdfs16(0x44a);
 y = (adapter == ADAPTER_CGA) ? 25 : rdfs8(0x484)+1;
 ```
 
-Next, we get the amount of columns by address `0x44a` and rows by address `0x484` and store them in `boot_params.screen_info.orig_video_cols` and `boot_params.screen_info.orig_video_lines`. After this, execution of `store_mode_params` is finished.
+Depois, obtemos a quantidade de colunas pelo endereços `0x44a` e linhas pelo endereço `0x484` e armazena eles em `boot_params.screen_info.orig_video_cols` e `boot_params.screen_info.orig_video_lines`. Depois disso, execução do `store_mode_params` é concluída.
 
-Next we can see the `save_screen` function which just saves the contents of the screen to the heap. This function collects all the data which we got in the previous functions (like the rows and columns, and stuff) and stores it in the `saved_screen` structure, which is defined as:
+Depois iremos ver a função `save_screen` que salva o conteúdo da tela para o Heap. Essa função calota todos os dados que temos na função (como as linhas e colunas e outras coisas) anterior e guarda na estrutura  `saved_screen`, que é definido como:
+
 
 ```C
 static struct saved_screen {
@@ -177,16 +173,17 @@ static struct saved_screen {
 } saved;
 ```
 
-It then checks whether the heap has free space for it with:
+Isso então checa se o Heap tem espaços livres para:
 
 ```C
 if (!heap_free(saved.x*saved.y*sizeof(u16)+512))
 		return;
 ```
 
-and allocates space in the heap if it is enough and stores `saved_screen` in it.
+e aloca espaços na Heap se é suficiente e armazena o `saved_screen`.
 
-The next call is `probe_cards(0)` from [arch/x86/boot/video-mode.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/video-mode.c) source code file. It goes over all video_cards and collects the number of modes provided by the cards. Here is the interesting part, we can see the loop:
+A próxima chamada é `probe_cards(0)` do arquivo do código fonte [arch/x86/boot/video-mode.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/video-mode.c).  Está sobre todos video_cards e coleta o número de modos fornecido pela cards. Aqui é uma parte interessante, nós podemos ver o loop:
+
 
 ```C
 for (card = video_cards; card < video_cards_end; card++) {
@@ -194,7 +191,7 @@ for (card = video_cards; card < video_cards_end; card++) {
 }
 ```
 
-but `video_cards` is not declared anywhere. The answer is simple: every video mode presented in the x86 kernel setup code has a definition that looks like this:
+mas `video_cards` não é declarado em qualquer lugar. A resposta é simples: todo modo vídeo presente no código de inicialização do kernel x86 tem definição que parecida com isso:
 
 ```C
 static __videocard video_vga = {
@@ -204,13 +201,13 @@ static __videocard video_vga = {
 };
 ```
 
-where `__videocard` is a macro:
+onde `__videocard` é uma macro:
 
 ```C
 #define __videocard struct card_info __attribute__((used,section(".videocards")))
 ```
 
-which means that the `card_info` structure:
+o que significa que a estrutura do `card_info`:
 
 ```C
 struct card_info {
@@ -225,7 +222,7 @@ struct card_info {
 };
 ```
 
-is in the `.videocards` segment. Let's look in the [arch/x86/boot/setup.ld](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/setup.ld) linker script, where we can find:
+está nos segmento `.videocards`. Deixe olhar no script do linker onde podemos encontrar:
 
 ```
 	.videocards	: {
@@ -235,13 +232,13 @@ is in the `.videocards` segment. Let's look in the [arch/x86/boot/setup.ld](http
 	}
 ```
 
-It means that `video_cards` is just a memory address and all `card_info` structures are placed in this segment. It means that all `card_info` structures are placed between `video_cards` and `video_cards_end`, so we can use a loop to go over all of it. After `probe_cards` executes we have a bunch of structures like `static __videocard video_vga` with the `nmodes` (the number of video modes) filled in.
+Isso significa que o `video_cards` é apenas um endereço de memória e todas estruturas `card_info` são colocadas neste segmento. Significa que todas as estrutura `card_info` são colocados entre `video_cards` e `video_cards_end`, então podemos usar o loop sobre todos eles. Depois de executar `probe_cards` teremos várias estruturas como `static __videocard video_vga` com o `nmodes` (o número do modo de vídeo) preenchidos.
 
-After the `probe_cards` function is done, we move to the main loop in the `set_video` function. There is an infinite loop which tries to set up the video mode with the `set_mode` function or prints a menu if we passed `vid_mode=ask` to the kernel command line or if video mode is undefined.
+Depois a função `probe_cards` é concluída, moveremos para o principla loop na função `set_video`. Tem um loop infinito que tenta configurar o modo vídeo com a função `set_mode` ou mostra um menu se passarmos `vid_mode=ask` para a linha de comando do kernel ou se modo vídeo está indefinido.
 
-The `set_mode` function is defined in [video-mode.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/video-mode.c) and gets only one parameter, `mode`, which is the number of video modes (we got this value from the menu or in the start of `setup_video`, from the kernel setup header).
+A função `set_mode` é definida em [video-mode.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/video-mode.c) e tem um parâmetro `mode`, o parâmetro é o número do modos do vídeo (esse valor é do menu ou no começo do `setup_video` do header de inicialização do kernel).
 
-The `set_mode` function checks the `mode` and calls the `raw_set_mode` function. The `raw_set_mode` calls the selected card's `set_mode` function, i.e. `card->set_mode(struct mode_info*)`. We can get access to this function from the `card_info` structure. Every video mode defines this structure with values filled depending upon the video mode (for example for `vga` it is the `video_vga.set_mode` function. See the above example of the `card_info` structure for `vga`). `video_vga.set_mode` is `vga_set_mode`, which checks the vga mode and calls the respective function:
+A função `set_mode` checa o `mode` e chama a função `raw_set_mode`. A `raw_set_mode` chama o card selecionado da função `set_mode`, isto é, `card->set_mode(struct mode_info*)`. Poderemos ter acesso para essa função da estrutura `card_info`. Todo modo vídeo define essa estrutura com valores preenchidos dependendo do modo vídeo (por exemplo pela `vga` é na função `video_vga.set_mode`. Veja acima o exemplo da estrutura `card_info` para `vga`). `video_vga.set_mode` é `vga_set_mode` ue checa o modo vga e chama a respectiva função:
 
 ```C
 static int vga_set_mode(struct mode_info *mode)
@@ -277,24 +274,25 @@ static int vga_set_mode(struct mode_info *mode)
 }
 ```
 
-Every function which sets up video mode just calls the `0x10` BIOS interrupt with a certain value in the `AH` register.
+Toda função que defini modo vídeo chama a interrupção da BIOS `0x10` como um certo valor no registro `AH`.
 
-After we have set the video mode, we pass it to `boot_params.hdr.vid_mode`.
+Depois teremos definido modo vídeo, passaremos para `boot_params.hdr.vid_mode`.
 
-Next, `vesa_store_edid` is called. This function simply stores the [EDID](https://en.wikipedia.org/wiki/Extended_Display_Identification_Data) (**E**xtended **D**isplay **I**dentification **D**ata) information for kernel use. After this `store_mode_params` is called again. Lastly, if `do_restore` is set, the screen is restored to an earlier state.
+Em seguida `vesa_store_edid` é chamado. Essa função simplesmente armazena a informação [EDID](https://en.wikipedia.org/wiki/Extended_Display_Identification_Data) (**E**xtended **D**isplay **I**dentification **D**ata) para o kernel usar. Essa  `store_mode_params` é chamado de novo. Por último, se `do_restore` é definido, a tela é restaurada para o estado anterior. 
 
-Having done this, the video mode setup is complete and now we can switch to the protected mode.
+Feito isso, o ajuste para o modo vídeo está completo e agora podemos mudar para o modo protegido.
 
-Last preparation before transition into protected mode
+
+última preparação antes da transição no modo protegido
 --------------------------------------------------------------------------------
 
-We can see the last function call - `go_to_protected_mode` - in [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c). As the comment says: `Do the last things and invoke protected mode`, so let's see what these last things are and switch into protected mode.
+Nós podemos ver a última chamada de função `go_to_protected_mode` [arch/x86/boot/main.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/main.c).
 
-The `go_to_protected_mode` function is defined in [arch/x86/boot/pm.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/pm.c). It contains some functions which make the last preparations before we can jump into protected mode, so let's look at it and try to understand what it does and how it works.
+A função `go_to_protected_mode` é definido em [arch/x86/boot/pm.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/pm.c). Contém algumas funções que faz o última preparação antes de nós podemos pular para o modo protegido, então observaremos, entender o que elas fazem e como faz.
 
-First is the call to the `realmode_switch_hook` function in `go_to_protected_mode`. This function invokes the real mode switch hook if it is present and disables [NMI](http://en.wikipedia.org/wiki/Non-maskable_interrupt). Hooks are used if the bootloader runs in a hostile environment. You can read more about hooks in the [boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt) (see **ADVANCED BOOT LOADER HOOKS**).
+Primeira chamada para a função `realmode_switch_hook` em `go_to_protected_mode`. Essa função invoca os hooks para mudar do modo real se estiver presente e desativar [NMI](http://en.wikipedia.org/wiki/Non-maskable_interrupt). Hooks são usado se o bootloader corre em um ambiente hostil. Você pode ler mais sobre hooks no [boot protocol](https://www.kernel.org/doc/Documentation/x86/boot.txt) (veja **ADVANCED BOOT LOADER HOOKS**).
 
-The `realmode_switch` hook presents a pointer to the 16-bit real mode far subroutine which disables non-maskable interrupts. After the `realmode_switch` hook (it isn't present for me) is checked, Non-Maskable Interrupts(NMI) is disabled:
+O hook `realmode_switch` apresente um ponteiro para uma sub-rotina para o modo real 16-bit que desativa interrupções non-Maskable. Depois o hook `realmode_switch` (isto não é presente para mim) é checado, interruptor é non-Maskable Interrupts(NMI) é desabilitado:
 
 ```assembly
 asm volatile("cli");
@@ -302,11 +300,11 @@ outb(0x80, 0x70);	/* Disable NMI */
 io_delay();
 ```
 
-At first, there is an inline assembly statement with a `cli` instruction which clears the interrupt flag (`IF`). After this, external interrupts are disabled. The next line disables NMI (non-maskable interrupt).
+Em primeiro, há uma declaração de assembly inline com uma instrução `cli` que limpa a flag (`IF`). Depois disso, interrupções externas são desabilitadas. O próximo linha desativa NMI (non-maskable interrupt).
 
-An interrupt is a signal to the CPU which is emitted by hardware or software. After getting such a signal, the CPU suspends the current instruction sequence, saves its state and transfers control to the interrupt handler. After the interrupt handler has finished it's work, it transfers control back to the interrupted instruction. Non-maskable interrupts (NMI) are interrupts which are always processed, independently of permission. They cannot be ignored and are typically used to signal for non-recoverable hardware errors. We will not dive into the details of interrupts now but we will be discussing them in the coming posts.
+Uma interrupção é um sinal para o CPU que é omitido por hardware ou software. Depois obter esse sinal, a CPU suspende o sequencia de instrução atual, salva o estado e transfere o controle para manipular a interrupção. Depois que o manipulador de interrupções termina o trabalho, ele tranfere o controle de volta para a instrução interrompida. Non-maskable interrupts (NMI) são interrupções que são sempre processado, independentemente da permissão. Eles não pode ser ignorado e são tipicamente usado para o sinal para os erros de hardware non-recoverable. Nós não iremos mergulhar no detalhe de interrupções agora, mas iremos discuti-los no próximo posts.
 
-Let's get back to the code. We can see in the second line that we are writing the byte `0x80` (disabled bit) to `0x70` (the CMOS Address register). After that, a call to the `io_delay` function occurs. `io_delay` causes a small delay and looks like:
+Vamos voltar ao código. Nós podemos ver no segunda linha que nós estamos escrevendo o byte `0x80` (desabilitar bit) para `0x70` (o registro de endereço CMOS). Depois, ocorre a chamada de função `io_delay`. `io_delay` causa um pequeno atraso e parece como:
 
 ```C
 static inline void io_delay(void)
@@ -315,6 +313,12 @@ static inline void io_delay(void)
 	asm volatile("outb %%al,%0" : : "dN" (DELAY_PORT));
 }
 ```
+
+
+
+
+
+
 
 To output any byte to the port `0x80` should delay exactly 1 microsecond. So we can write any value (the value from `AL` in our case) to the `0x80` port. After this delay the `realmode_switch_hook` function has finished execution and we can move to the next function.
 
