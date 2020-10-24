@@ -71,7 +71,7 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 }
 ```
 
-This parameter is passed through assembly from the [arch/x86/boot/compressed/head_64.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/compressed/head_64.S)source code file:
+This parameter is passed through assembly from the [arch/x86/boot/compressed/head_64.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/compressed/head_64.S) source code file:
 
 ```C
 leaq	input_data(%rip), %rdx
@@ -146,7 +146,7 @@ Now, we call another function:
 initialize_identity_maps();
 ```
 
-The `initialize_identity_maps` function is defined in the [arch/x86/boot/compressed/kaslr_64.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/compressed/kaslr_64.c) source code file. This function starts by initialising an instance of the `x86_mapping_info` structure called `mapping_info`:
+The `initialize_identity_maps` function is defined in the [arch/x86/boot/compressed/kaslr_64.c](https://github.com/torvalds/linux/blob/master/arch/x86/boot/compressed/kaslr_64.c) source code file. This function starts by initialising an instance of the `x86_mapping_info` structure called `mapping_info`:
 
 ```C
 mapping_info.alloc_pgt_page = alloc_pgt_page;
