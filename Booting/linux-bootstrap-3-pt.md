@@ -302,7 +302,7 @@ io_delay();
 
 Em primeiro, há uma declaração de assembly inline com uma instrução `cli` que limpa a flag (`IF`). Depois disso, interrupções externas são desabilitadas. O próximo linha desativa NMI (non-maskable interrupt).
 
-Uma interrupção é um sinal para o CPU que é omitido por hardware ou software. Depois obter esse sinal, a CPU suspende o sequencia de instrução atual, salva o estado e transfere o controle para manipular a interrupção. Depois que o manipulador de interrupções termina o trabalho, ele tranfere o controle de volta para a instrução interrompida. Non-maskable interrupts (NMI) são interrupções que são sempre processado, independentemente da permissão. Eles não pode ser ignorado e são tipicamente usado para o sinal para os erros de hardware non-recoverable. Nós não iremos mergulhar no detalhe de interrupções agora, mas iremos discuti-los no próximo posts.
+Uma interrupção é um sinal para o CPU que é omitido por hardware ou software. Depois obter esse sinal, a CPU suspende o sequencia de instrução atual, salva o estado e transfere o controle para manipular a interrupção. Depois que o manipulador de interrupções termina o trabalho, ele transfere o controle de volta para a instrução interrompida. Non-maskable interrupts (NMI) são interrupções que são sempre processado, independentemente da permissão. Eles não pode ser ignorado e são tipicamente usado para o sinal para os erros de hardware non-recoverable. Nós não iremos mergulhar no detalhe de interrupções agora, mas iremos discuti-los no próximo posts.
 
 Vamos voltar ao código. Nós podemos ver no segunda linha que nós estamos escrevendo o byte `0x80` (desabilitar bit) para `0x70` (o registro de endereço CMOS). Depois, ocorre a chamada de função `io_delay`. `io_delay` causa um pequeno atraso e parece como:
 
@@ -313,16 +313,10 @@ static inline void io_delay(void)
 	asm volatile("outb %%al,%0" : : "dN" (DELAY_PORT));
 }
 ```
+Saída de qualquer byte para a porta `0x80` deveria atrasar exatamente 1 microssegundo. Então nós podemos escrever qualquer valor (o valor do `AL` em nossa casa) para a porta `0x80`. Depois desse atraso, a função `realmode_switch_hook` foi concluída e podemos ir para próximo função.
 
+A próximo função é `enable_a20`, que ativa o [A20 line](http://en.wikipedia.org/wiki/A20_line). Essa função é definida em [arch/x86/boot/a20.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/a20.c) e tenta habilitar a porta A20 com diferentes métodos. O primeiro é a função `a20_test_short` que checa se A20 está habilitada ou não com a função `a20_test`:
 
-
-
-
-
-
-To output any byte to the port `0x80` should delay exactly 1 microsecond. So we can write any value (the value from `AL` in our case) to the `0x80` port. After this delay the `realmode_switch_hook` function has finished execution and we can move to the next function.
-
-The next function is `enable_a20`, which enables the [A20 line](http://en.wikipedia.org/wiki/A20_line). This function is defined in [arch/x86/boot/a20.c](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/a20.c) and it tries to enable the A20 gate with different methods. The first is the `a20_test_short` function which checks if A20 is already enabled or not with the `a20_test` function:
 
 ```C
 static int a20_test(int loops)
@@ -348,13 +342,14 @@ static int a20_test(int loops)
 }
 ```
 
-First of all, we put `0x0000` in the `FS` register and `0xffff` in the `GS` register. Next, we read the value at the address `A20_TEST_ADDR` (it is `0x200`) and put this value into the variables `saved` and `ctr`.
+Primeiro e tudo, nós colocamos `0x0000` no registro `FS` e `0xffff` no registro `GS`. Próximo, lemos o valor no endereço `A20_TEST_ADDR` e colocamos esse valor nas variáveis `saved` and `ctr`.
 
-Next, we write an updated `ctr` value into `fs:A20_TEST_ADDR` or `fs:0x200` with the `wrfs32` function, then delay for 1ms, and then read the value from the `GS` register into the address `A20_TEST_ADDR+0x10`. In a case when `a20` line is disabled, the address will be overlapped, in other case if it's not zero `a20` line is already enabled the A20 line.
+Em seguida escrevemos para atualizar o valor `ctr` no `fs:A20_TEST_ADDR` ou `fs:0x200` com a função `wrfs32`, então atrasa para 1ms, e então lê o valor do registro `GS` no endereço `A20_TEST_ADDR+0x10`. Em uma função quando linha `A20` é desabilitada, o endereço vai ser sobreposto, em outros casos se não for zero a linha `A20`, então já está habilitada A20.
 
-If A20 is disabled, we try to enable it with a different method which you can find in `a20.c`. For example, it can be done with a call to the `0x15` BIOS interrupt with `AH=0x2041`.
+Se A20 está desativada, temos habilitar com diferentes métodos que você poderá encontrar em  `a20.c`. Por exemplo, pode ser feito com um chamado para interrupção da BIOS `0x15` com `AH=0x2041`.
 
-If the `enable_a20` function finished with a failure, print an error message and call the function `die`. You can remember it from the first source code file where we started - [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
+Se a função `enable_a20` terminar com um erro, mostra uma mensagem de erro e chama a função `die`. Você lembra do primeiro arquivo do código fonte  aonde começamos - [arch/x86/boot/header.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/header.S):
+
 
 ```assembly
 die:
@@ -363,30 +358,31 @@ die:
 	.size	die, .-die
 ```
 
-After the A20 gate is successfully enabled, the `reset_coprocessor` function is called:
+Continuando depois da porta A20 está habilitada sem problemas, a função `reset_coprocessor` é chamada:
 
 ```C
 outb(0, 0xf0);
 outb(0, 0xf1);
 ```
 
-This function clears the Math Coprocessor by writing `0` to `0xf0` and then resets it by writing `0` to `0xf1`.
+Essa função limpa o coprocessador matemático escrevendo `0` para `0xf0`, então reset escrevendo `0` para `0xf1`.
 
-After this, the `mask_all_interrupts` function is called:
+Continuando, a função `mask_all_interrupts` é chamada:
 
 ```C
 outb(0xff, 0xa1);       /* Mask all interrupts on the secondary PIC */
 outb(0xfb, 0x21);       /* Mask all but cascade on the primary PIC */
 ```
 
-This masks all interrupts on the secondary PIC (Programmable Interrupt Controller) and primary PIC except for IRQ2 on the primary PIC.
+Essa mascara todas as interrupções no PIC (Programmable Interrupt Controller) secundário e PIC primário exceto  para IRQ2 no PIC primário.
 
-And after all of these preparations, we can see the actual transition into protected mode.
+Quando finalizar todas essas operações, vemos a transição atual para o modo protegido.
 
-Set up the Interrupt Descriptor Table
+
+Defini a Interrupt Descriptor Table
 --------------------------------------------------------------------------------
 
-Now we set up the Interrupt Descriptor table (IDT) in the `setup_idt` function:
+Agora nós definimos Interrupt Descriptor table (IDT) no função `setup_idt`: 
 
 ```C
 static void setup_idt(void)
@@ -396,7 +392,7 @@ static void setup_idt(void)
 }
 ```
 
-which sets up the Interrupt Descriptor Table (describes interrupt handlers and etc.). For now, the IDT is not installed (we will see it later), but now we just load the IDT with the `lidtl` instruction. `null_idt` contains the address and size of the IDT, but for now they are just zero. `null_idt` is a `gdt_ptr` structure, it is defined as:
+Que defini o Interrupt Descriptor Table (descreve manipuladores de interrupções e etc). Por agora, o IDT não e instalado (mais tarde), mas apenas carrega o IDT com a instrução `lidtl`. O `null_idt` contém o endereço e o tamanho do IDT, mas agora são zero. O `null_idt` é uma estrutura `gdt_ptr`, é definido como:
 
 ```C
 struct gdt_ptr {
@@ -405,12 +401,12 @@ struct gdt_ptr {
 } __attribute__((packed));
 ```
 
-where we can see the 16-bit length(`len`) of the IDT and the 32-bit pointer to it (More details about the IDT and interruptions will be seen in the next posts). ` __attribute__((packed))` means that the size of `gdt_ptr` is the minimum required size. So the size of the `gdt_ptr` will be 6 bytes here or 48 bits. (Next we will load the pointer to the `gdt_ptr` to the `GDTR` register and you might remember from the previous post that it is 48-bits in size).
+Onde vemos comprimento (`len`) 16-bit do IDT e o ponteiro de 32-bit para isso (mais detalhes sobre o IDT e interrupções visto no próximo postagem). ` __attribute__((packed))` significa que o tamanho do `gdt_ptr` é o tamanho mínimo requerido. Então o tamanho do `gdt_ptr` será 6 bytes aqui ou 48 bits. (Iremos carrega o ponteiro `gdt_ptr` para o registro `GDTR` e lembre que 48-bits no tamanho).
 
-Set up Global Descriptor Table
+Definir Global Descriptor Table
 --------------------------------------------------------------------------------
 
-Next is the setup of the Global Descriptor Table (GDT). We can see the `setup_gdt` function which sets up the GDT (you can read about it in the post [Kernel booting process. Part 2.](linux-bootstrap-2.md#protected-mode)). There is a definition of the `boot_gdt` array in this function, which contains the definition of the three segments:
+Setup do Global Descriptor Table (GDT). Vemos na função `setup_gdt` que defini o GDT (ler sobre essa postagem [Kernel booting process. Part 2.](linux-bootstrap-2.md#protected-mode)). Existe uma definição do array `boot_gdt` nesta função, que contém a definição dos três segmentos:
 
 ```C
 static const u64 boot_gdt[] __attribute__((aligned(16))) = {
@@ -420,9 +416,9 @@ static const u64 boot_gdt[] __attribute__((aligned(16))) = {
 };
 ```
 
-for code, data and TSS (Task State Segment). We will not use the task state segment for now, it was added there to make Intel VT happy as we can see in the comment line (if you're interested you can find the commit which describes it - [here](https://github.com/torvalds/linux/commit/88089519f302f1296b4739be45699f06f728ec31)). Let's look at `boot_gdt`. First of all note that it has the `__attribute__((aligned(16)))` attribute. It means that this structure will be aligned by 16 bytes.
+Para codigo, dados e TSS (Task state segment). Não usaremos o TSS por agora. ele foi adicionado para fazer Intel VT happy como nós podemos ver no linha de comentário (se você está interessado pode encontrar o commit que descreve isso - [aqui](https://github.com/torvalds/linux/commit/88089519f302f1296b4739be45699f06f728ec31)). Deixe-nos observar o `boot_gdt`. Primeiro de tudo nota que tem o atributo `__attribute__((aligned(16)))`. Significa que essa estrutura  vai ser alinhada por 16 bytes.
 
-Let's look at a simple example:
+Deixe-nos observar um exemplo simples:
 
 ```C
 #include <stdio.h>
@@ -447,7 +443,7 @@ int main(void)
 }
 ```
 
-Technically a structure which contains one `int` field must be 4 bytes in size, but an `aligned` structure will need 16 bytes to store in memory:
+Tecnicamente uma estrutura que contém 1 campo `int` deve ser 4 bytes de tamanho, mas uma estrutura `aligned` precisará de 16 bytes para memória.
 
 ```
 $ gcc test.c -o test && test
@@ -455,59 +451,63 @@ Not aligned - 4
 Aligned - 16
 ```
 
-The `GDT_ENTRY_BOOT_CS` has index - 2 here, `GDT_ENTRY_BOOT_DS` is `GDT_ENTRY_BOOT_CS + 1` and etc. It starts from 2, because the first is a mandatory null descriptor (index - 0) and the second is not used (index - 1).
+O `GDT_ENTRY_BOOT_CS` tem índice - 2 aqui, `GDT_ENTRY_BOOT_DS` é `GDT_ENTRY_BOOT_CS + 1` e etc. Ele começa do 2, porquê o primeiro é um descritor nulo obrigatório (índice - 0) e o segundo não está usado (index - 1).
 
-`GDT_ENTRY` is a macro which takes flags, base, limit and builds a GDT entry. For example, let's look at the code segment entry. `GDT_ENTRY` takes the following values:
+`GDT_ENTRY` é um macro que recebe flags, base, limite e construir um entrada GDT. Por exemplo, deixe-nos olhar no entrada de segmento de código. `GDT_ENTRY` leva o valores seguidos:
 
 * base  - 0
-* limit - 0xfffff
+* limite - 0xfffff
 * flags - 0xc09b
 
-What does this mean? The segment's base address is 0, and the limit (size of segment) is - `0xfffff` (1 MB). Let's look at the flags. It is `0xc09b` and it will be:
+O que isso significa? O endereço base de segment é 0 e o limite (tamanho de segmento) é - `0xfffff` (1 MiB). Deixe-nos olhar no flags. Isso é `0xc09b` e será:
 
 ```
 1100 0000 1001 1011
 ```
 
-in binary. Let's try to understand what every bit means. We will go through all bits from left to right:
+Em binário. Deixe-nos tentar entender o que todo bit significativo. Nós iremos ir aravés de todos os bits da esquerda para direita:
 
 * 1    - (G) granularity bit
-* 1    - (D) if 0 16-bit segment; 1 = 32-bit segment
-* 0    - (L) executed in 64-bit mode if 1
-* 0    - (AVL) available for use by system software
-* 0000 - 4-bit length 19:16 bits in the descriptor
-* 1    - (P) segment presence in memory
-* 00   - (DPL) - privilege level, 0 is the highest privilege
-* 1    - (S) code or data segment, not a system segment
-* 101  - segment type execute/read/
-* 1    - accessed bit
+* 1    - (D) Se 0 segmento 16-bit; 1 = segmento 32-bit
+* 0    - (L) executado em modo 64-bit se 1
+* 0    - (AVL) disponível para usar pelo software do sistema
+* 0000 - comprimento 4-bit 19:16 bits no descritor
+* 1    - (P) presença de sgmento na memória
+* 00   - (DPL) - nível de privilégio, 0 é alto privilégio
+* 1    - (S) segmento de código ou dados, não um segmento de sistema
+* 101  - tipo de segmento executar/ler
+* 1    - bit acessado
 
-You can read more about every bit in the previous [post](linux-bootstrap-2.md) or in the [Intel® 64 and IA-32 Architectures Software Developer's Manuals 3A](http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html).
+Você pode ler mais na [postagem](linux-bootstrap-2.md) anterior ou no [Intel® 64 and IA-32 Architectures Software Developer's Manuals 3A](http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html).
 
-After this we get the length of the GDT with:
+Depois esse recebemos o comprimento do GDT com:
 
 ```C
 gdt.len = sizeof(boot_gdt)-1;
 ```
 
-We get the size of `boot_gdt` and subtract 1 (the last valid address in the GDT).
+Nós recebemos o tamanho do `boot_gdt` e subtrai 1 (o último endereço válido no GDT).
 
-Next we get a pointer to the GDT with:
+Nós obtemos um ponteiro para o GDT com:
 
 ```C
 gdt.ptr = (u32)&boot_gdt + (ds() << 4);
 ```
 
-Here we just get the address of `boot_gdt` and add it to the address of the data segment left-shifted by 4 bits (remember we're in real mode now).
+Aqui nós temos o endereço do `boot_gdt` e adicionamos para o endereço do segmento de dados deslocar para esquerda por 4 bis (lembre que estamos em modo real).
 
-Lastly we execute the `lgdtl` instruction to load the GDT into the GDTR register:
+
+Por último executamos a instrução `lgdtl` para carregar o GDT no registro GSTR:
 
 ```C
 asm volatile("lgdtl %0" : : "m" (gdt));
 ```
 
-Actual transition into protected mode
+Transição atual no modo protegido
 --------------------------------------------------------------------------------
+
+
+
 
 This is the end of the `go_to_protected_mode` function. We loaded the IDT and GDT, disabled interrupts and now can switch the CPU into protected mode. The last step is calling the `protected_mode_jump` function with two parameters:
 
