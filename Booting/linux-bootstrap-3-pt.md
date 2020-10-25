@@ -506,36 +506,33 @@ asm volatile("lgdtl %0" : : "m" (gdt));
 Transição atual no modo protegido
 --------------------------------------------------------------------------------
 
-
-
-
-This is the end of the `go_to_protected_mode` function. We loaded the IDT and GDT, disabled interrupts and now can switch the CPU into protected mode. The last step is calling the `protected_mode_jump` function with two parameters:
+Isso o final da função `go_to_protected_mode`. Nós carregamos o IDT e GDT, interrupções desativado e agora pode alternar o CPU no modo protegido. O último passo é chamando a função `protected_mode_jump` com dois parâmetros:
 
 ```C
 protected_mode_jump(boot_params.hdr.code32_start, (u32)&boot_params + (ds() << 4));
 ```
 
-which is defined in [arch/x86/boot/pmjump.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/pmjump.S).
+que é definido em [arch/x86/boot/pmjump.S](https://github.com/torvalds/linux/blob/v4.16/arch/x86/boot/pmjump.S).
 
-It takes two parameters:
+Ele recebe dois parâmetros:
 
-* address of the protected mode entry point
-* address of `boot_params`
+* endereço do modo protegido ponto de entrada
+* endereço do `boot_params` 
 
-Let's look inside `protected_mode_jump`. As I wrote above, you can find it in `arch/x86/boot/pmjump.S`. The first parameter will be in the `eax` register and the second one is in `edx`.
+Deixe-nos observar `protected_mode_jump`. Como eu escrevi acima você pode encontrar no `arch/x86/boot/pmjump.S`. O primeiro parâmetro estará no registro `eax` e o segundo no `edx`.
 
-First of all, we put the address of `boot_params` in the `esi` register and the address of the code segment register `cs` in `bx`. After this, we shift `bx` by 4 bits and add it to the memory location labeled `2` (which is `(cs << 4) + in_pm32`, the physical address to jump after transitioned to 32-bit mode) and jump to label `1`. So after this `in_pm32` in label `2` will be overwritten with `(cs << 4) + in_pm32`.
+Primeiro de tudo, nós colocamos o endereço do `boot_params` no registro `esi` e o endereço do registro do segmento de código `cs` em `bx`. Depois disso, deslocaremos `bx` para 4 bits e adiciona para a localização da memória com label `2` (que é `(cs << 4) + in_pm32`, o endereço físicopara pular depois da transação para modo 32-bit) e pula para o label `1`. Então depois disso `in_pm32` no label `2` será substituído com `(cs << 4) + in_pm32`.
 
-Next we put the data segment and the task state segment in the `cx` and `di` registers with:
+Seguindo, colocamos o segmento de dados e o TSS no registro `cx` e `di` com:
 
 ```assembly
 movw	$__BOOT_DS, %cx
 movw	$__BOOT_TSS, %di
 ```
 
-As you can read above `GDT_ENTRY_BOOT_CS` has index 2 and every GDT entry is 8 byte, so `CS` will be `2 * 8 = 16`, `__BOOT_DS` is 24 etc.
+Como você pode ler acima `GDT_ENTRY_BOOT_CS` tem índice 2 e toda entrada GDT é 8 byte, então `CS` será `2 * 8 = 16`, `__BOOT_DS` é 24 etc.
 
-Next, we set the `PE` (Protection Enable) bit in the `CR0` control register:
+Próximo, nós definimos o bit `PE` (proteção ativada) no registro controle `CR0`:
 
 ```assembly
 movl	%cr0, %edx
@@ -543,7 +540,7 @@ orb	$X86_CR0_PE, %dl
 movl	%edx, %cr0
 ```
 
-and make a long jump to protected mode:
+e faz um longo pulo para o modo de proteção:
 
 ```assembly
 	.byte	0x66, 0xea
@@ -551,21 +548,21 @@ and make a long jump to protected mode:
 	.word	__BOOT_CS
 ```
 
-where:
+onde:
 
-* `0x66` is the operand-size prefix which allows us to mix 16-bit and 32-bit code
-* `0xea` - is the jump opcode
-* `in_pm32` is the segment offset under protect mode, which has value `(cs << 4) + in_pm32` derived from real mode
-* `__BOOT_CS` is the code segment we want to jump to.
+* `0x66` é tamanho do operando prefixo que nos permiti para mix código 16-bit e 32-bit
+* `0xea` - é o opcode jump
+* `in_pm32` é o deslocamento do segmento no modo de proteção que tem valor `(cs << 4) + in_pm32` derivado do modo real
+* `__BOOT_CS` é o segmento de código nós queremos pular.
 
-After this we are finally in protected mode:
+Depois disso nós estamos finalmente no modo protegido:
 
 ```assembly
 .code32
 .section ".text32","ax"
 ```
 
-Let's look at the first steps taken in protected mode. First of all we set up the data segment with:
+Vejamos os primeiros passos dados no modo protegido. Em primeiro lugar, configuramos o segmento de dados com: 
 
 ```assembly
 movl	%ecx, %ds
@@ -575,15 +572,15 @@ movl	%ecx, %gs
 movl	%ecx, %ss
 ```
 
-If you paid attention, you can remember that we saved `$__BOOT_DS` in the `cx` register. Now we fill it with all segment registers besides `cs` (`cs` is already `__BOOT_CS`).
+Se você prestou atenção, lembra que nós salvamos `$__BOOT_DS` no registro `cx`. Agora preenchemos eles com todos registros de segmento além de `cs` (`cs` é já `__BOOT_CS`).
 
-And setup a valid stack for debugging purposes:
+E defini uma stack válida para propósito debugging (depuração):
 
 ```assembly
 addl	%ebx, %esp
 ```
 
-The last step before the jump into 32-bit entry point is to clear the general purpose registers:
+O ultimo passo antes de pular no ponto de entrada 32-bit é limpado o registros de propósito geral:
 
 ```assembly
 xorl	%ecx, %ecx
@@ -593,24 +590,22 @@ xorl	%ebp, %ebp
 xorl	%edi, %edi
 ```
 
-And jump to the 32-bit entry point in the end:
+E pula para ponto de entrada de 32-bit no final:
 
 ```
 jmpl	*%eax
 ```
 
-Remember that `eax` contains the address of the 32-bit entry (we passed it as the first parameter into `protected_mode_jump`).
+Lembre que `eax` contem o endereço de ponto de entrada de 32-bit (nós passamos ele como o primeiro parâmetro no `protected_mode_jump`).
 
-That's all. We're in protected mode and stop at its entry point. We will see what happens next in the next part.
+Isso é tudo. Nós estamos no modo protegido e para no ponto de entrada. Nós veremos o que acontece nas próximas partes.
 
-Conclusion
+Conclusão
 --------------------------------------------------------------------------------
 
-This is the end of the third part about linux kernel insides. In the next part, we will look at the first steps we take in protected mode and transition into [long mode](http://en.wikipedia.org/wiki/Long_mode).
+Essa é o final da terceira parte sobre linux kernel insidees. No próxima parte, nós iremos olhar no primeiros passo do modo protegido e transição para [modo longo](http://en.wikipedia.org/wiki/Long_mode).
 
-If you have any questions or suggestions write me a comment or ping me at [twitter](https://twitter.com/0xAX).
-
-**Please note that English is not my first language, And I am really sorry for any inconvenience. If you find any mistakes, please send me a PR with corrections at [linux-insides](https://github.com/0xAX/linux-internals).**
+Se você tem qualquer questão ou sugestão me escreva um comentário ou me ping no [twitter](https://twitter.com/h4child).
 
 Links
 --------------------------------------------------------------------------------
@@ -622,4 +617,4 @@ Links
 * [A20](http://en.wikipedia.org/wiki/A20_line)
 * [GCC designated inits](https://gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/Designated-Inits.html)
 * [GCC type attributes](https://gcc.gnu.org/onlinedocs/gcc/Type-Attributes.html)
-* [Previous part](linux-bootstrap-2.md)
+* [PParte anterior](linux-bootstrap-2-pt.md)
