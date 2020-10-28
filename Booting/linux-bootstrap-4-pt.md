@@ -616,7 +616,7 @@ Isso é tudo!
 Conclusão
 --------------------------------------------------------------------------------
 
-Este é o fm da quarta parte do processo de booting kernel Linux. Se você ter qualquer questão ou sugestão, me ping twitter
+Este é o fm da quarta parte do processo de booting kernel Linux. Se você ter qualquer questão ou sugestão, me ping [twitter](https://twitter.com/h4child)
 
 This is the end of the fourth part of the linux kernel booting process. If you have any questions or suggestions, ping me on twitter [h4child](https://twitter.com/h4child), mande-me um [email](h4child@protonmail.ch) ou crie uma [issue](https://github.com/h4child/linux-insides-pt/issues/new).
 

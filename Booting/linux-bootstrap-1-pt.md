@@ -8,7 +8,7 @@ Se você leu as minhas [postagens anteriores](https://0xax.github.io/categories/
 
 Eu tenho um grande interesse em entender como as coisas funcionam em baixo nível, como os programas executam no computador, como são localizados na memória, como o kernel administra os processos e memória, como a stack (pilha) de rede funcionam em baixo nível e muitas outras coisas. Então, eu decidi escrever uma série de postagens sobre kernel Linux para arquitetura **x86_64**.
 
-Note que e não sou um profissional kernel hacker e eu não escrevo código para o kernel no trabalho. É apenas um hobby. Eu apenas gosto das coisas em baixo nível e é interessante para eu ver como essas coisas funcionam. Então se você perceber algo confuso ou se você ter qualquer perguntas/observações, me avise no twitter [autor 0xAX](https://twitter.com/0xAX) [tradutor rodgger](https://twitter.com/rodgger1), 
+Note que e não sou um profissional kernel hacker e eu não escrevo código para o kernel no trabalho. É apenas um hobby. Eu apenas gosto das coisas em baixo nível e é interessante para eu ver como essas coisas funcionam. Então se você perceber algo confuso ou se você ter qualquer perguntas/observações, me avise no twitter [autor 0xAX](https://twitter.com/0xAX) [tradutor h4child](https://twitter.com/h4child), envie um [email](mailto:h4child@protonmail.ch) ou apenas crie uma [issue](https://github.com/h4child/linux-insides-pt/issues/new). Eu lhe agradeço.
 
 Se você encontrar alguma coisa errada com meu português ou sobre o conteúdo, sinta-se livre para enviar um pull request.
 
@@ -27,20 +27,20 @@ Eu comecei a escrever estas postagens na versão `3.18` do kernel Linux, e muita
 O Mágico Botão Power(ligar), o que acontece depois?
 --------------------------------------------------------------------------------
 
-Embora isso é uma série de postagens sobre kernel linux, não começaremos diretamente no código do kernel. Assim que pressionar o mágico botão power no laptop ou computador desktop, começa funcionar. A placa-mãe envia um sinal para [power suply](https://en.wikipedia.org/wiki/Power_supply)[(similar pt)](https://pt.wikipedia.org/wiki/Fonte_de_alimentação) e tenta iniciar a CPU.A CPU reset todos os dados nos registros e predefini para cada um deles
+Embora isso é uma série de postagens sobre kernel linux, não começaremos diretamente no código do kernel. Assim que pressionar o mágico botão power no laptop ou computador desktop, começa funcionar. A placa-mãe recebe um sinal para [power suply](https://en.wikipedia.org/wiki/Power_supply), tenta iniciar a CPU. A CPU reseta todos os dados nos registros e predefini para cada um deles.
 
-O [80386](https://en.wikipedia.org/wiki/Intel_80386)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_80386) e os CPUs posteriores definem os seguintes dados predefinidos nos registros da CPU após reset.
+O [80386](https://en.wikipedia.org/wiki/Intel_80386) e os CPUs posteriores definem os seguintes dados predefinidos nos registros da CPU após reset.
 
 ```
 IP          0xFFF0
 CS selector 0xF000
 CS base     0xFFFF0000
 ```
-O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode)[(similar pt)](https://pt.wikipedia.org/wiki/Modo_real). Irei voltar um pouco e tentar entender [segmentação da memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086)[(similar pt)](https://pt.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, que significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 mebibyte`. Mas apenas tem registros `16-bit` que tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
+O processador começa funcionando em [modo real](https://en.wikipedia.org/wiki/Real_mode). Irei voltar um pouco e tentar entender o [segmento da memória](https://en.wikipedia.org/wiki/Memory_segmentation) neste modo. No Modo real é suportado em todos os processadores compatível x86, do CPU [8086](https://en.wikipedia.org/wiki/Intel_8086) até as mais modernas como CPU 64-bit da Intel. O processador `8086` tem 20-bit de endereço bus, que significa que deveria funcionar com um espaço de endereço `0-0xFFFFF` ou `1 mebibyte`. Mas apenas tem registros `16-bit` que tem um endereço máximo de `2^16 - 1` ou `0xFFFF` (64 kibibyte).
 
-A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é usado para utilizar todo o espaço de endereço disponível. Toda memória é dividida em pequenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativa foi inventada.
+A [Segmentação de memória](https://en.wikipedia.org/wiki/Memory_segmentation)[(similar pt)](https://pt.wikipedia.org/wiki/Segmentação_%28memória%29) é usado para utilizar todo o espaço de endereço disponível. Toda memória é dividida em pequenos segmentos de tamanhos fixo de `65536` bytes (64KiB). Como não podemos acessar a memória acima de `64KiB`com registros de 16-bit, um método alternativo foi inventada.
 
-Um endereço consiste em duas partes: um seletor de segmento que tem uma base de endereço e um offset (deslocamento) da base de endereço. No modo real, o endereço da base associada de um seletor de segmento é `seletor de segmento * 16`. Então, para obter um endereço físico na memória, nós precisamos multiplicar o seletor do segmento por `16` e adicionar o deslocamento  para isso:
+Um endereço consiste em duas partes: um seletor de segmento, que tem uma base de endereço; e um deslocamento desse endereço base. No modo real, o endereço da base é associada de um seletor de segmento é `seletor de segmento * 16`. Então, para obter um endereço físico na memória, nós precisamos multiplicar o seletor do segmento por `16` e adicionar o deslocamento  para isso:
 
 ```
 PhysicalAddress = Segment Selector * 16 + Offset
@@ -53,7 +53,7 @@ Por exemplo, se `CS:IP` é `0x2000:0x0010`, então o endereço físico correspon
 '0x20010'
 ```
 
-Mas, pegarmos o maior seletor de segmentos e offset, `0xFFFF:0xFFFF`, então o endereço será:
+Mas, se pegarmos o maior seletor de segmentos e offset, `0xFFFF:0xFFFF`, então o endereço será:
 
 
 ```python
@@ -74,7 +74,7 @@ O endereço inicial é formato adicionando o endereço base ao valor no registro
 '0xfffffff0'
 ```
 
-Obtemos `0xFFFFFFF0`, que é 16 bytes abaixo dos 4GiB. Esse ponteiro é chamado de [redefinir vetor(reset vector)](https://en.wikipedia.org/wiki/Reset_vector). É a localização de memória no qual a CPU esperar encontrar o primeira instrução para executar depois do reset. Contém uma instrução [jump](https://en.wikipedia.org/wiki/JMP_%28x86_instruction%29)[(similar pt)](http://marco.uminho.pt/~joao/Computacao2/node47.html) (`jmp`) que usualmente aponta para a entrada da [Bios](https://en.wikipedia.org/wiki/BIOS)[(similar pt)](https://pt.wikipedia.org/wiki/BIOS)(Basic Input/Output System). Por exemplo, se olharmos no código fonte(`src/cpu/x86/16bit/reset16.inc` [github](https://github.com/coreboot/coreboot/blob/master/src/cpu/x86/16bit/reset16.inc)) [coreboot](https://www.coreboot.org/), veremos:
+Obtemos `0xFFFFFFF0`, que é 16 bytes abaixo dos 4GiB. Esse ponteiro é chamado de [reset vector](https://en.wikipedia.org/wiki/Reset_vector). É a localização de memória no qual a CPU esperar encontrar o primeira instrução para executar depois do reset. Contém uma instrução [jump](https://en.wikipedia.org/wiki/JMP_%28x86_instruction%29)[(similar pt)](http://marco.uminho.pt/~joao/Computacao2/node47.html) (`jmp`) que usualmente aponta para o ponto de entrada da [Bios](https://en.wikipedia.org/wiki/BIOS)[(similar pt)](https://pt.wikipedia.org/wiki/BIOS)(Basic Input/Output System). Por exemplo, se olharmos no código fonte(`src/cpu/x86/16bit/reset16.inc` [github](https://github.com/coreboot/coreboot/blob/master/src/cpu/x86/16bit/reset16.inc)) [coreboot](https://www.coreboot.org/), veremos:
 
 ```assembly
     .section ".reset", "ax", %progbits
@@ -106,7 +106,7 @@ SECTIONS {
 }
 ```
 
-Agora inicia a BIOS. Após inicializar e checar o hardware, a BIOS precisa encontrar um dispositivo iniciável. A ordem do boot é armazenado na configuração da BIOS, controlando a partir de qual dispositivo a BIOS usar. Iniciar de um hard disk, a BIOS tenta encontrar um setor boot. Na partição hard disk com um [layout da partição MBR](https://en.wikipedia.org/wiki/Master_boot_record)[(similar pt)](https://pt.wikipedia.org/wiki/Master_Boot_Record), o setor de boot é armazenado no primeiro `446` bytes do primeiro setor, onde cada setor é `512` bytes. O dois bytes finais do primeiro setor são `0x55` e `0xaa`, que indica a BIOS que o dispositivo é iniciável.
+Agora inicia a BIOS. Após inicializar e checar o hardware, a BIOS deve encontrar um dispositivo iniciável. A ordem do boot é armazenado na configuração da BIOS, controlando a partir de qual dispositivo usar. Iniciar de um hard disk, a BIOS tenta encontrar um setor boot. Na partição hard disk com um [layout da partição MBR](https://en.wikipedia.org/wiki/Master_boot_record)[(similar pt)](https://pt.wikipedia.org/wiki/Master_Boot_Record), o setor de boot é armazenado no primeiro `446` bytes do primeiro setor, onde cada setor é `512` bytes. Os dois bytes finais do primeiro setor são `0x55` e `0xaa`, que indica a BIOS que o dispositivo é iniciável. Logo que a BIOS enconrar o setor boot, copia na localização de memória fixa 0x7c00, pula para esse endereço e então começa executa-lo.
 
 Por exemplo:
 
@@ -137,7 +137,7 @@ Construir e executar isso com:
 nasm -f bin boot.nasm && qemu-system-x86_64 boot
 ```
 
-Isso instruirá o [QEMU](https://www.qemu.org/) usar o binário `boot` que nós contruimos a imagem de disco. Como o binário gerado pelo código do assembly acima cumpre o requerimento do setor boot (a origem é definido para `0x7c00` e nós finalizamos com a sequencia mágica), QEMU vai atuar binário como o Master Boot Record (MBR) de uma imagem de disco. 
+Isso instruirá o [QEMU](https://www.qemu.org/) usar o binário `boot` que nós contruimos a imagem de disco. Como o binário gerado pelo código do assembly acima cumpre o requerimento do setor boot (nós concluímos com a sequência mágica), QEMU vai tratar binário como o Master Boot Record (MBR) de uma imagem de disco. Observe que quando geramos uma imagem do binário boot para QEMU, definindo a origem para 0x7c00 (usando `[ORG  0x7c00]`)
 
 Você irá ver:
 
