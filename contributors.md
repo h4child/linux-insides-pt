@@ -138,3 +138,6 @@ Obrigado a todos que contribuiram:
 * [Bruno Meneguele](https://github.com/bmeneguele)
 * [Sebastian Fricke](https://github.com/initBasti)
 * [Zhouyi Zhou](https://github.com/zhouzhouyi-hub)
+* [Mingzhe Yang](https://github.com/Mutated1994)
+* [Yuxin Wu](https://github.com/chaffz)
+* [Biao Ding](https://github.com/SmallPond)
