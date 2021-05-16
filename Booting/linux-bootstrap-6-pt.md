@@ -1,12 +1,12 @@
-Kernel booting process. Part 6.
+Processo de booting do kernel. parte 6.
 ================================================================================
 
-Introduction
+Introdução
 --------------------------------------------------------------------------------
 
-This is the sixth part of the `Kernel booting process` series. In the [previous part](linux-bootstrap-5.md) we took a look at the final stages of the Linux kernel boot process. But we have skipped some important, more advanced parts.
+Esse é a sexta parte da série de `processo de booting do kernel`. Na [parte anterior](linux-bootstrap-5-pt.md) olhamos o estágio final do processo de boot do kernel Linux. Mas nós pulamos algumas partes importantes, mais partes avançadas.
 
-As you may remember, the entry point of the Linux kernel is the `start_kernel` function defined in the [main.c](https://github.com/torvalds/linux/blob/v4.16/init/main.c) source code file. This function is executed  at the address stored in `LOAD_PHYSICAL_ADDR`. and depends on the `CONFIG_PHYSICAL_START` kernel configuration option, which is `0x1000000` by default:
+Você lembra, o ponto de entrado do kernel Linux é a função `start_kernel` definida no [main.c](https://github.com/torvalds/linux/blob/v4.16/init/main.c) do arquivo código fonte. Essa função é executada no endereço armazenado no `LOAD_PHYSICAL_ADDR` e depende da opção de configuração do kernel `CONFIG_PHYSICAL_START` que é `0x1000000` por padrão:
 
 ```
 config PHYSICAL_START
@@ -19,11 +19,12 @@ config PHYSICAL_START
       ...
 ```
 
-This value may be changed during kernel configuration, but the load address can also be configured to be a random value. For this purpose, the `CONFIG_RANDOMIZE_BASE` kernel configuration option should be enabled during kernel configuration.
+Esse valor pode ser mudado durante a configuração do kernel, mas o endereço de carga pode também ser configurado oara ser valor aleatório. Nesse propósito a opção de kernel `CONFIG_RANDOMIZE_BASE` deveria ser habilitado  durante a configuração do kernel.
 
-Now, the physical address where the Linux kernel image will be decompressed and loaded will be randomized. This part considers the case when the `CONFIG_RANDOMIZE_BASE` option is enabled and the load address of the kernel image is randomized for [security reasons](https://en.wikipedia.org/wiki/Address_space_layout_randomization).
+Agora, o endereço físico do kernel onde a imagem do kernel será descompactado e será carregado aleatório. Essa parte considera o caso aonde a opção `CONFIG_RANDOMIZE_BASE` é habilitada e o carregar o endereço da imagem está aleatório para [reações de segurança](https://en.wikipedia.org/wiki/Address_space_layout_randomization).
 
-Page Table Initialization
+
+Inicialização do Page Table
 --------------------------------------------------------------------------------
 
 Before the kernel decompressor can look for a random memory range to decompress and load the kernel to, the identity mapped page tables should be initialized. If the [bootloader](https://en.wikipedia.org/wiki/Booting) used the [16-bit or 32-bit boot protocol](https://github.com/torvalds/linux/blob/v4.16/Documentation/x86/boot.txt), we already have page tables. But, there may be problems if the kernel decompressor selects a memory range which is valid only in a 64-bit context. That's why we need to build new identity mapped page tables.
