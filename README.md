@@ -32,7 +32,7 @@ Autor
 
 Tradutor
 ---------------
-[@rodgger1](https://twitter.com/rodgger1)
+[rody](https://t.me/h4child)
 
 LICENSE
 -------------
